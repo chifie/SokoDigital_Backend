@@ -175,7 +175,10 @@ async def get_seller_by_slug(
 ):
     """Fetch a seller's public profile by their store URL slug."""
     result = await db.execute(
-        select(Seller).where(Seller.store_slug == store_slug)
+        select(Seller).where(
+            Seller.store_slug == store_slug,
+            Seller.is_active == True,
+        )
     )
     seller = result.scalar_one_or_none()
     if seller is None:
