@@ -51,12 +51,20 @@ async def health_check():
 # ---------------------------------------------------------------------------
 # API v1 routers
 # ---------------------------------------------------------------------------
+from app.api.v1 import addresses as addresses_router
 from app.api.v1 import auth as auth_router
 from app.api.v1 import categories as categories_router
+from app.api.v1 import orders as orders_router
 from app.api.v1 import products as products_router
+from app.api.v1 import reviews as reviews_router
 from app.api.v1 import sellers as sellers_router
+from app.api.v1 import wishlist as wishlist_router
 
+app.include_router(addresses_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(auth_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(categories_router.router, prefix=settings.API_V1_PREFIX)
+app.include_router(orders_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(products_router.router, prefix=settings.API_V1_PREFIX)
+app.include_router(reviews_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sellers_router.router, prefix=settings.API_V1_PREFIX)
+app.include_router(wishlist_router.router, prefix=settings.API_V1_PREFIX)
