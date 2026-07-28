@@ -1,7 +1,8 @@
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user, require_admin
@@ -20,9 +21,6 @@ from app.schemas.engagement import (
     NotificationResponse,
     NotificationUnreadCount,
 )
-
-router = APIRouter(tags=["Engagement"])
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # COUPONS
@@ -196,18 +194,18 @@ async def unread_notification_count(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Notification).where(
+        select(func.count(Notification.id)).where(
             Notification.user_id == current_user.id,
             Notification.read == False,
         )
     )
-    count = len(result.scalars().all())
+    count = result.scalar() or 0
     return NotificationUnreadCount(count=count)
 
 
 @notification_router.put("/{notification_id}/read", response_model=NotificationResponse, summary="Mark notification as read")
 async def mark_notification_read(
-    notification_id: str,
+    notification_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
