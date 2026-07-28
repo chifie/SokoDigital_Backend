@@ -4,8 +4,18 @@ from app.schemas.auth import (
     UserRegister,
     UserResponse,
 )
+from app.schemas.category import (
+    CategoryCreate,
+    CategoryResponse,
+    CategoryTreeNode,
+    CategoryUpdate,
+)
 
 __all__ = [
+    "CategoryCreate",
+    "CategoryResponse",
+    "CategoryTreeNode",
+    "CategoryUpdate",
     "TokenResponse",
     "UserLogin",
     "UserRegister",
