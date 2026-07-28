@@ -1,6 +1,13 @@
+from pathlib import Path
 from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Absolute path to .env in the project root – prevents pydantic-settings
+# from searching parent directories and accidentally loading another .env file.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_ENV_FILE = _PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -43,7 +50,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
