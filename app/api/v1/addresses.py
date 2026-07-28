@@ -41,14 +41,16 @@ async def create_address(
     current_user: User = Depends(get_current_user),
 ):
     if body.is_default:
-        await db.execute(
-            select(Address).where(Address.user_id == current_user.id, Address.is_default == True)
+        # Unset any existing default address
+        existing_default = await db.execute(
+            select(Address).where(
+                Address.user_id == current_user.id,
+                Address.is_default == True,
+            )
         )
-        await db.execute(
-            Address.__table__.update().where(
-                Address.user_id == current_user.id
-            ).values(is_default=False)
-        )
+        old_default = existing_default.scalar_one_or_none()
+        if old_default:
+            old_default.is_default = False
 
     address = Address(**body.model_dump(), user_id=current_user.id)
     db.add(address)

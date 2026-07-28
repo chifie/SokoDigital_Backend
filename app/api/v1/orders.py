@@ -59,7 +59,7 @@ async def checkout(
         if product.quantity < item_in.quantity:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficient stock for {product.name}")
 
-        unit_price = product.discount_price or product.price
+        unit_price = product.discount_price if product.discount_price is not None else product.price
         subtotal = unit_price * item_in.quantity
         total += subtotal
 
