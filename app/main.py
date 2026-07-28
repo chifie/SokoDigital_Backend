@@ -49,9 +49,8 @@ async def health_check():
 
 
 # ---------------------------------------------------------------------------
-# API v1 router (routes will be added here as phases progress)
+# API v1 routers
 # ---------------------------------------------------------------------------
-# from app.api.v1 import auth, products, categories  # uncomment as built
-# app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
-# app.include_router(products.router, prefix=settings.API_V1_PREFIX)
-# app.include_router(categories.router, prefix=settings.API_V1_PREFIX)
+from app.api.v1 import auth as auth_router
+
+app.include_router(auth_router.router, prefix=settings.API_V1_PREFIX)
