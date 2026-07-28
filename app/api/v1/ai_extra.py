@@ -8,6 +8,7 @@ from app.api.dependencies import get_optional_user, require_admin
 from app.config import settings
 from app.database import get_db
 from app.models.newsletter import NewsletterSubscriber
+from app.models.user import User
 from app.schemas.ai import (
     ChatRequest,
     ChatResponse,
