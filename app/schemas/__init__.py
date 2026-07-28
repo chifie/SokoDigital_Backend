@@ -10,6 +10,13 @@ from app.schemas.category import (
     CategoryTreeNode,
     CategoryUpdate,
 )
+from app.schemas.product import (
+    ProductCreate,
+    ProductImageSchema,
+    ProductResponse,
+    ProductSearchParams,
+    ProductUpdate,
+)
 from app.schemas.seller import (
     SellerDashboard,
     SellerOnboard,
@@ -22,6 +29,11 @@ __all__ = [
     "CategoryResponse",
     "CategoryTreeNode",
     "CategoryUpdate",
+    "ProductCreate",
+    "ProductImageSchema",
+    "ProductResponse",
+    "ProductSearchParams",
+    "ProductUpdate",
     "SellerDashboard",
     "SellerOnboard",
     "SellerResponse",
