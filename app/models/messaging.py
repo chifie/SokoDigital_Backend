@@ -6,12 +6,11 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
-    Integer,
     String,
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID as UUID_TYPE
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -23,9 +22,9 @@ class Conversation(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    # Comma-separated user IDs for the participants
-    participant_ids: Mapped[str] = mapped_column(
-        String(500), nullable=False, index=True
+    # Array of participant UUIDs for efficient querying with @> operator
+    participant_ids: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(UUID_TYPE(as_uuid=True)), nullable=False
     )
     # Optional product ID if the conversation is about a specific product
     product_id: Mapped[uuid.UUID | None] = mapped_column(
