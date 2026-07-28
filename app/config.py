@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # API
     API_V1_PREFIX: str = "/api/v1"
 
+    # Frontend URL (for email links)
+    APP_URL: str = "http://localhost:5173"
+
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sokodigital_db"
 
@@ -48,6 +51,13 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: Optional[str] = None
+
+    # AI (OpenAI-compatible)
+    AI_API_KEY: Optional[str] = None
+    AI_API_URL: str = "https://api.openai.com/v1/chat/completions"
+    AI_MODEL: str = "gpt-4o-mini"
+    AI_MAX_TOKENS: int = 1024
 
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE),

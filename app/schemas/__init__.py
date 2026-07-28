@@ -1,3 +1,11 @@
+from app.schemas.ai import (
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    NewsletterSubscribeRequest,
+    NewsletterSubscriberResponse,
+    NewsletterUnsubscribeRequest,
+)
 from app.schemas.auth import (
     TokenResponse,
     UserLogin,
@@ -52,6 +60,12 @@ from app.schemas.shopping import (
 )
 
 __all__ = [
+    "ChatMessage",
+    "ChatRequest",
+    "ChatResponse",
+    "NewsletterSubscribeRequest",
+    "NewsletterSubscriberResponse",
+    "NewsletterUnsubscribeRequest",
     "AddressCreate",
     "AddressResponse",
     "AddressUpdate",
