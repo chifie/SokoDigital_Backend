@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import ARRAY, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +42,11 @@ class Seller(Base):
     total_sales: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_products: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     followers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Badges (e.g. ["Top Seller", "Fast Shipper"])
+    badges: Mapped[list[str] | None] = mapped_column(
+        ARRAY(String(100)), nullable=True
+    )
 
     # Seller behavior
     response_rate: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
