@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sokodigital"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sokodigital_db"
 
     # JWT
     SECRET_KEY: str = "change-me-in-production"
