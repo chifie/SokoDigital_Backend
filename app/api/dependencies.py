@@ -60,3 +60,20 @@ async def get_current_user(
         )
 
     return user
+
+
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency that requires the current user to have the ``admin`` role.
+
+    Must be chained *after* ``get_current_user`` (or used in its place when
+    combined via ``Depends(require_admin)`` which implicitly calls
+    ``get_current_user`` first).
+
+    Raises ``403 FORBIDDEN`` if the user is not an admin.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user
