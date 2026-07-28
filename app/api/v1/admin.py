@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import Date, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import require_admin
@@ -42,7 +43,7 @@ async def list_users(
 
 @router.get("/users/{user_id}", summary="Get user details (admin)")
 async def get_user(
-    user_id: str,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -55,7 +56,7 @@ async def get_user(
 
 @router.put("/users/{user_id}/role", summary="Update user role (admin)")
 async def update_user_role(
-    user_id: str,
+    user_id: uuid.UUID,
     role: str = Query(..., pattern=r"^(customer|seller|admin)$"),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -71,7 +72,7 @@ async def update_user_role(
 
 @router.put("/users/{user_id}/toggle-active", summary="Toggle user active status (admin)")
 async def toggle_user_active(
-    user_id: str,
+    user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -109,7 +110,7 @@ async def list_all_products(
 
 @router.put("/products/{product_id}/status", summary="Moderate product status (admin)")
 async def moderate_product(
-    product_id: str,
+    product_id: uuid.UUID,
     status: str = Query(..., pattern=r"^(active|draft|archived)$"),
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
@@ -168,9 +169,7 @@ async def revenue_analytics(
     _admin: User = Depends(require_admin),
 ):
     """Revenue breakdown by day for the last N days."""
-    from sqlalchemy import cast, Date
-
-    cutoff = datetime.now(timezone.utc)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     result = await db.execute(
         select(
             cast(Order.created_at, Date).label("date"),
