@@ -10,6 +10,7 @@ from app.models.user import User
 from app.services.auth import decode_access_token
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -77,3 +78,39 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="Admin access required",
         )
     return current_user
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Like ``get_current_user`` but returns ``None`` instead of raising
+    when no valid token is provided.
+
+    Use this in endpoints where authentication is optional (e.g. public
+    AI chat, browse-as-guest).
+    """
+    if credentials is None:
+        return None
+
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+
+    user_id: str | None = payload.get("sub")
+    if user_id is None:
+        return None
+
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        return None
+
+    result = await db.execute(select(User).where(User.id == uid))
+    user = result.scalar_one_or_none()
+
+    if user is None or not user.is_active:
+        return None
+
+    return user

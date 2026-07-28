@@ -4,11 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_optional_user, require_admin
 from app.config import settings
 from app.database import get_db
 from app.models.newsletter import NewsletterSubscriber
-from app.models.user import User
 from app.schemas.ai import (
     ChatRequest,
     ChatResponse,
@@ -36,7 +35,7 @@ router = APIRouter(tags=["AI & Extras"])
 )
 async def ai_chat(
     body: ChatRequest,
-    current_user: User | None = Depends(get_current_user),
+    current_user: User | None = Depends(get_optional_user),
 ):
     """Send a message to the AI shopping assistant and get a reply.
 
@@ -154,14 +153,9 @@ async def unsubscribe_newsletter(
 )
 async def list_subscribers(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """List all active newsletter subscribers. Requires admin role."""
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
     result = await db.execute(
         select(NewsletterSubscriber)
         .where(NewsletterSubscriber.is_active == True)

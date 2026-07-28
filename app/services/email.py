@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -103,22 +104,12 @@ def _get_subject(template_name: str) -> str:
     return subjects.get(template_name, "Notification from SokoDigital")
 
 
-async def send_email(
+def _send_sync(
     to_email: str,
     template_name: str,
-    context: dict[str, Any] | None = None,
+    context: dict[str, Any],
 ) -> bool:
-    """Send an email via SMTP.
-
-    Returns ``True`` on success, ``False`` if SMTP is not configured.
-    Raises on other errors.
-    """
-    if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        logger.warning("SMTP not configured — skipping email to %s", to_email)
-        return False
-
-    context = context or {}
-
+    """Synchronous SMTP send — runs in a thread to avoid blocking the event loop."""
     html = _build_html(template_name, context)
     subject = _get_subject(template_name)
     from_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USER
@@ -129,15 +120,33 @@ async def send_email(
     msg["Subject"] = subject
     msg.attach(MIMEText(html, "html"))
 
-    # Send via SMTP
+    server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+    server.starttls()
+    server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+    server.sendmail(from_email, [to_email], msg.as_string())
+    server.quit()
+    logger.info("Email sent to %s (template=%s)", to_email, template_name)
+    return True
+
+
+async def send_email(
+    to_email: str,
+    template_name: str,
+    context: dict[str, Any] | None = None,
+) -> bool:
+    """Send an email via SMTP in a background thread.
+
+    Returns ``True`` on success, ``False`` if SMTP is not configured.
+    Raises on other errors.
+    """
+    if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        logger.warning("SMTP not configured — skipping email to %s", to_email)
+        return False
+
     try:
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
-        server.starttls()
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.sendmail(from_email, [to_email], msg.as_string())
-        server.quit()
-        logger.info("Email sent to %s (template=%s)", to_email, template_name)
-        return True
+        return await asyncio.to_thread(
+            _send_sync, to_email, template_name, context or {}
+        )
     except smtplib.SMTPException as exc:
         logger.error("Failed to send email to %s: %s", to_email, exc)
         raise
