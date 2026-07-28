@@ -6,6 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_current_user, require_admin
+from app.database import get_db
+from app.models.category import Category
+from app.models.user import User
+from app.schemas.category import (
+    CategoryCreate,
+    CategoryResponse,
+    CategoryTreeNode,
+    CategoryUpdate,
+)
 
 
 # ── Default categories matching the frontend constants ───────────────────────
@@ -48,15 +57,6 @@ SEED_CATEGORIES: list[dict] = [
     {"name": "Books", "slug": "books", "icon": "BookOpen", "image": "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=800&q=100&fm=webp&fit=crop", "sort_order": 14},
     {"name": "Health", "slug": "health", "icon": "Heart", "image": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=100&fm=webp&fit=crop", "sort_order": 15},
 ]
-from app.database import get_db
-from app.models.category import Category
-from app.models.user import User
-from app.schemas.category import (
-    CategoryCreate,
-    CategoryResponse,
-    CategoryTreeNode,
-    CategoryUpdate,
-)
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
@@ -252,7 +252,7 @@ async def seed_categories(
     created_children = 0
 
     for parent_data in SEED_CATEGORIES:
-        children_data = parent_data.pop("children", [])
+        children_data = parent_data.get("children", [])
 
         # Skip if slug exists
         existing = await db.execute(
