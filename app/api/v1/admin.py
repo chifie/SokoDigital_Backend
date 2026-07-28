@@ -12,6 +12,7 @@ from app.models.product import Product
 from app.models.seller import Seller
 from app.models.shopping import Order, OrderItem, Review
 from app.models.user import User
+from app.schemas.auth import UserResponse
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 # USER MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════
 
-@router.get("/users", summary="List all users (admin)")
+@router.get("/users", response_model=list[UserResponse], summary="List all users (admin)")
 async def list_users(
     role: str | None = Query(None, description="Filter by role: customer, seller, admin"),
     search: str | None = Query(None, description="Search by email or username"),
@@ -41,7 +42,7 @@ async def list_users(
     return result.scalars().all()
 
 
-@router.get("/users/{user_id}", summary="Get user details (admin)")
+@router.get("/users/{user_id}", response_model=UserResponse, summary="Get user details (admin)")
 async def get_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -92,7 +93,7 @@ async def toggle_user_active(
 @router.get("/products", summary="List all products for moderation (admin)")
 async def list_all_products(
     status: str | None = Query(None, description="Filter by status"),
-    seller_id: str | None = None,
+    seller_id: uuid.UUID | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -134,20 +135,13 @@ async def admin_dashboard(
     _admin: User = Depends(require_admin),
 ):
     """Aggregated marketplace stats for the admin dashboard."""
-    # User counts
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
     total_sellers = (await db.execute(select(func.count(User.id)).where(User.role == "seller"))).scalar() or 0
-
-    # Product stats
     total_products = (await db.execute(select(func.count(Product.id)))).scalar() or 0
     active_products = (await db.execute(select(func.count(Product.id)).where(Product.status == "active"))).scalar() or 0
-
-    # Order stats
     total_orders = (await db.execute(select(func.count(Order.id)))).scalar() or 0
     total_revenue = (await db.execute(select(func.coalesce(func.sum(Order.total), 0)))).scalar() or 0.0
     avg_order_value = total_revenue / total_orders if total_orders > 0 else 0
-
-    # Seller stats
     total_seller_accounts = (await db.execute(select(func.count(Seller.id)))).scalar() or 0
 
     return {
@@ -184,13 +178,9 @@ async def revenue_analytics(
         {"date": str(row.date), "amount": float(row.revenue), "orders": row.orders}
         for row in result.all()
     ]
-
-    total_revenue = sum(d["amount"] for d in daily_sales)
-    total_orders = sum(d["orders"] for d in daily_sales)
-
     return {
-        "total_revenue": round(total_revenue, 2),
-        "total_orders": total_orders,
+        "total_revenue": round(sum(d["amount"] for d in daily_sales), 2),
+        "total_orders": sum(d["orders"] for d in daily_sales),
         "daily_sales": daily_sales,
     }
 
@@ -208,7 +198,6 @@ async def top_products(
         .order_by(Product.sold.desc())
         .limit(limit)
     )
-    products = result.scalars().all()
     return [
         {
             "product_id": str(p.id),
@@ -216,7 +205,7 @@ async def top_products(
             "sales": p.sold,
             "revenue": round(p.sold * (p.discount_price or p.price), 2),
         }
-        for p in products
+        for p in result.scalars().all()
     ]
 
 
@@ -238,7 +227,6 @@ async def revenue_by_category(
     )
     rows = result.all()
     total = sum(float(r.revenue) for r in rows) or 1
-
     return [
         {
             "category": r.name or "Uncategorized",
