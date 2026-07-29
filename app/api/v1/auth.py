@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_optional_user
+from app.config import settings
 from app.database import get_db
 from app.models.user import User
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.auth import (
     TokenResponse,
@@ -18,6 +22,7 @@ from app.services.auth import (
     hash_password,
     verify_password,
 )
+from app.services.email import send_email
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
