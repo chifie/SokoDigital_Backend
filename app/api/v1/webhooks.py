@@ -6,6 +6,7 @@ and view delivery history.
 
 import secrets
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -204,7 +205,7 @@ async def test_webhook(
         payload={
             "event": "test.ping",
             "webhook_id": str(webhook.id),
-            "timestamp": func.now(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )
 
