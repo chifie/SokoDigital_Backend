@@ -95,6 +95,13 @@ from app.utils.response import register_error_handlers
 register_error_handlers(app)
 
 # ---------------------------------------------------------------------------
+# API versioning middleware — adds version & deprecation headers
+# ---------------------------------------------------------------------------
+from app.middleware.versioning import APIVersioningMiddleware
+
+app.add_middleware(APIVersioningMiddleware, latest_version=settings.API_LATEST_VERSION)  # type: ignore[arg-type]
+
+# ---------------------------------------------------------------------------
 # Request ID middleware — attach a unique ID to every request
 # ---------------------------------------------------------------------------
 from app.middleware.request_id import RequestIDMiddleware
