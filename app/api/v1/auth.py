@@ -39,7 +39,11 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
         409: {"description": "Email or username already exists"},
     },
 )
-async def register(body: UserRegister, db: AsyncSession = Depends(get_db)) -> User:
+async def register(
+    body: UserRegister,
+    db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit(AUTH_RATE_LIMIT)),
+) -> User:
     """
     Create a new user account.
 
@@ -110,7 +114,11 @@ async def register(body: UserRegister, db: AsyncSession = Depends(get_db)) -> Us
         401: {"description": "Invalid credentials or account deactivated"},
     },
 )
-async def login(body: UserLogin, db: AsyncSession = Depends(get_db)) -> dict:
+async def login(
+    body: UserLogin,
+    db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit(AUTH_RATE_LIMIT)),
+) -> dict:
     """
     Authenticate with email/username + password and get an access token.
 
@@ -244,6 +252,7 @@ class EmailVerifySchema(BaseModel):
 async def verify_email(
     body: EmailVerifySchema,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit(AUTH_RATE_LIMIT)),
 ):
     """
     Verify a user's email address using the token sent during registration.
@@ -310,6 +319,7 @@ class ResendVerificationSchema(BaseModel):
 async def resend_verification(
     body: ResendVerificationSchema,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit(AUTH_RATE_LIMIT)),
 ):
     """
     Resend the email verification link to a user's email address.
@@ -373,6 +383,7 @@ class ForgotPasswordSchema(BaseModel):
 async def forgot_password(
     body: ForgotPasswordSchema,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit(AUTH_RATE_LIMIT)),
 ):
     """
     Request a password reset email.
@@ -432,6 +443,7 @@ class ResetPasswordSchema(BaseModel):
 async def reset_password(
     body: ResetPasswordSchema,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit(AUTH_RATE_LIMIT)),
 ):
     """
     Reset a user's password using a reset token.
