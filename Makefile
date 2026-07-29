@@ -15,6 +15,7 @@ DOCKER_COMPOSE := docker compose
 TEST_FLAGS := -v --tb=short -k "not test_email_verification"
 
 .PHONY: help install install-dev lint typecheck test test-all \  # help
+        test-e2e test-e2e-down precommit-install precommit-run \ # testing
         migrate migrate-autogen migrate-show migrate-down \      # database
         seed docker-up docker-down docker-build \                # docker
         clean format                                             # tools
@@ -56,6 +57,21 @@ test: ## Run unit tests (skips integration tests needing a database)
 
 test-all: ## Run all tests (unit + integration; requires running PostgreSQL)
 	$(PYTEST) tests/ -v --tb=short
+
+test-e2e: ## Run full test suite in Docker (isolated, ephemeral, reproducible)
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml up --build --abort-on-container-exit
+
+test-e2e-down: ## Tear down the E2E test infrastructure and clean volumes
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml down --volumes
+
+
+# ── Pre-commit hooks ─────────────────────────────────────────────────────────
+
+precommit-install: ## Install pre-commit hooks
+	pre-commit install
+
+precommit-run: ## Run pre-commit hooks on all files
+	pre-commit run --all-files
 
 
 # ── Database Migrations ──────────────────────────────────────────────────────
