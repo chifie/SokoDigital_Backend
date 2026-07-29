@@ -109,6 +109,14 @@ from app.middleware.request_id import RequestIDMiddleware
 app.add_middleware(RequestIDMiddleware)  # type: ignore[arg-type]
 
 # ---------------------------------------------------------------------------
+# OpenTelemetry tracing middleware (before other middleware to capture full span)
+# ---------------------------------------------------------------------------
+from app.middleware.tracing import TracingMiddleware, setup_tracing
+
+setup_tracing(service_name=settings.APP_NAME)
+app.add_middleware(TracingMiddleware)  # type: ignore[arg-type]
+
+# ---------------------------------------------------------------------------
 # Metrics middleware — Prometheus request tracking (before CORS so it sees all)
 # ---------------------------------------------------------------------------
 from app.middleware.metrics import MetricsMiddleware, metrics_endpoint
