@@ -1,0 +1,73 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SokoDigital API — Test Infrastructure
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Starts clean PostgreSQL + Redis instances, runs migrations + seed data,
+# executes the full test suite, then tears everything down.
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+#   docker compose -f docker-compose.test.yml down --volumes
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  test-db:
+    image: postgres:16-alpine
+    container_name: sokodigital-test-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sokodigital_test
+    ports:
+      - "15432:5432"  # Different port to avoid conflicts with local dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    tmpfs: /var/lib/postgresql/data  # Data lives only in memory — fast & ephemeral
+
+  test-redis:
+    image: redis:7-alpine
+    container_name: sokodigital-test-redis
+    ports:
+      - "16379:6379"  # Different port to avoid conflicts
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: sokodigital-test-runner
+    environment:
+      # Point to test services
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@test-db:5432/sokodigital_test
+      REDIS_URL: redis://test-redis:6379/0
+      SECRET_KEY: test-secret-key-not-for-production
+      APP_URL: http://localhost:5173
+      APP_NAME: SokoDigital API Test
+      DEBUG: "true"
+      ENVIRONMENT: testing
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        echo "⟳ Running migrations..."
+        alembic upgrade head
+        echo "✓ Migrations complete."
+        echo "⟳ Seeding data..."
+        alembic upgrade a1b2c3d4e5f6
+        echo "✓ Seed data complete."
+        echo "⟳ Running tests..."
+        python -m pytest tests/ -v --tb=short --junitxml=/app/test-results/results.xml
