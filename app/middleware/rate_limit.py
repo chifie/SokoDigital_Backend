@@ -118,32 +118,4 @@ def rate_limit(config: RateLimitConfig = GENERAL_RATE_LIMIT) -> Callable:
     return dependency
 
 
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """ASGI middleware that applies a default rate limit to all routes.
 
-    More specific rate limits can be applied per-endpoint using the
-    ``rate_limit()`` dependency above.
-    """
-
-    def __init__(
-        self,
-        app: FastAPI,
-        config: RateLimitConfig = GENERAL_RATE_LIMIT,
-    ) -> None:
-        super().__init__(app)
-        self.config = config
-
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
-        key = _get_client_key(request)
-        if not _limiter.check(key, self.config):
-            return Response(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                content='{"detail":"Too many requests. Please try again later."}',
-                media_type="application/json",
-                headers={
-                    "Retry-After": str(self.config.window_seconds),
-                },
-            )
-        return await call_next(request)
