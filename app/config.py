@@ -53,11 +53,17 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     SMTP_FROM_EMAIL: Optional[str] = None
 
+    # Redis (optional, for distributed rate limiting & caching)
+    REDIS_URL: Optional[str] = None
+
     # AI (OpenAI-compatible)
     AI_API_KEY: Optional[str] = None
     AI_API_URL: str = "https://api.openai.com/v1/chat/completions"
     AI_MODEL: str = "gpt-4o-mini"
     AI_MAX_TOKENS: int = 1024
+
+    # Test database (optional — overrides DATABASE_URL for tests)
+    TEST_DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
 
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE),
