@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from datetime import datetime, timezone
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -46,11 +48,38 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Health check
+# Health check & API metadata
 # ---------------------------------------------------------------------------
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "version": settings.APP_VERSION}
+    """
+    Health check endpoint.
+
+    Returns the current service status, version, and a timestamp.
+    Used by Docker HEALTHCHECK and monitoring systems.
+    """
+    return {
+        "status": "ok",
+        "version": settings.APP_VERSION,
+        "app_name": settings.APP_NAME,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "environment": "production" if not settings.DEBUG else "development",
+    }
+
+
+@app.get("/api", summary="API version information")
+async def api_info():
+    """
+    Return metadata about the API — version, available endpoints, and docs links.
+    """
+    return {
+        "name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "openapi": f"{settings.API_V1_PREFIX}/openapi.json",
+        "api_prefix": settings.API_V1_PREFIX,
+    }
 
 
 # ---------------------------------------------------------------------------
