@@ -62,6 +62,15 @@ async def lifespan(application: FastAPI):
     # Create all tables on startup (for development convenience)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Configure Meilisearch index if URL is set
+    if settings.MEILISEARCH_URL:
+        try:
+            from app.services.search import configure_index
+            await configure_index()
+        except Exception:
+            logger.warning("Failed to configure Meilisearch index", exc_info=True)
+
     yield
     # Dispose of the connection pool on shutdown
     await engine.dispose()
