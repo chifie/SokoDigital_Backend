@@ -101,10 +101,7 @@ async def list_categories(
         stmt = stmt.where(Category.is_active == True)
 
     result = await db.execute(stmt)
-    categories = result.scalars().all()
-
-    # Only return top-level categories (no parent) — their children are loaded
-    return [c for c in categories if c.parent_id is None]
+    return result.scalars().all()
 
 
 # ── GET /categories/tree (nested tree) ──────────────────────────────────────
