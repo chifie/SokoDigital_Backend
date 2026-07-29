@@ -67,16 +67,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         run: |
-          python -m pytest tests/ -v --tb=short -k "not test_email_verification"
+          python -m pytest tests/ -v --tb=short -k "not test_email_verification" --cov-report=
 
       - name: Run integration tests with PostgreSQL
         run: |
-          python -m pytest tests/test_email_verification.py -v --tb=short
+          python -m pytest tests/test_email_verification.py -v --tb=short --cov-report=
         env:
           DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/sokodigital_test"
           SOKO_TESTING: ""
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
 
   build:
     name: Build & Docker
