@@ -1,4 +1,5 @@
 import logging
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -129,24 +130,21 @@ from app.utils.response import register_error_handlers
 register_error_handlers(app)
 
 # If Sentry is active, attach a before-send callback to scrub sensitive data
-if settings.SENTRY_DSN:
-    try:
-        import sentry_sdk
+if settings.SENTRY_DSN and "sentry_sdk" in sys.modules:
+    import sentry_sdk
 
-        def _before_send(event: dict, hint: dict) -> dict | None:
-            """Scrub sensitive fields from Sentry events before sending."""
-            if "request" in event and "data" in event["request"]:
-                data = event["request"]["data"]
-                if isinstance(data, dict):
-                    for field in ("password", "token", "secret", "authorization"):
-                        if field in data:
-                            data[field] = "[scrubbed]"
-            return event
+    def _before_send(event: dict, hint: dict) -> dict | None:
+        """Scrub sensitive fields from Sentry events before sending."""
+        if "request" in event and "data" in event["request"]:
+            data = event["request"]["data"]
+            if isinstance(data, dict):
+                for field in ("password", "token", "secret", "authorization"):
+                    if field in data:
+                        data[field] = "[scrubbed]"
+        return event
 
-        sentry_sdk.set_before_send_callback(_before_send)  # type: ignore[arg-type]
-        logger.debug("Sentry before-send callback registered (scrubs passwords)")
-    except ImportError:
-        pass
+    sentry_sdk.set_before_send_callback(_before_send)  # type: ignore[arg-type]
+    logger.debug("Sentry before-send callback registered (scrubs passwords)")
 
 # ---------------------------------------------------------------------------
 # API versioning middleware — adds version & deprecation headers
