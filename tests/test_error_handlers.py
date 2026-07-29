@@ -101,9 +101,9 @@ class TestHTTPExceptionHandler:
         body = response.body.decode()
 
         assert response.status_code == HTTP_404_NOT_FOUND
-        assert '"detail": "User not found"' in body
-        assert '"success": false' in body
-        assert '"message": "User not found"' in body
+        assert '"detail":"User not found"' in body
+        assert '"success":false' in body
+        assert '"message":"User not found"' in body
 
     @pytest.mark.asyncio
     async def test_400_response_shape(self) -> None:
@@ -114,8 +114,8 @@ class TestHTTPExceptionHandler:
         body = response.body.decode()
 
         assert response.status_code == HTTP_400_BAD_REQUEST
-        assert '"detail": "Bad input"' in body
-        assert '"success": false' in body
+        assert '"detail":"Bad input"' in body
+        assert '"success":false' in body
 
 
 # ── Unit tests for validation error handler ──────────────────────────────────
@@ -142,9 +142,9 @@ class TestValidationExceptionHandler:
         body = response.body.decode()
 
         assert response.status_code == HTTP_422_UNPROCESSABLE_CONTENT
-        assert '"success": false' in body
+        assert '"success":false' in body
         assert '"detail"' in body  # backward-compat key
-        assert '"message": "Validation error"' in body
+        assert '"message":"Validation error"' in body
 
 
 # ── Unit tests for general exception handler ─────────────────────────────────
@@ -169,7 +169,7 @@ class TestGeneralExceptionHandler:
             body = response.body.decode()
 
             assert response.status_code == HTTP_500_INTERNAL_SERVER_ERROR
-            assert '"success": false' in body
+            assert '"success":false' in body
             assert '"detail"' in body
             assert "Internal server error" in body
             # Error detail should NOT be leaked in production
