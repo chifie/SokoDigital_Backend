@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,10 +12,17 @@ from app.config import settings
 from app.database import engine
 from app.models.base import Base
 
+# Set up structured logging before anything else
+from app.middleware.request_id import setup_logging
+
+setup_logging()
+logger = logging.getLogger("app")
+
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     """Lifecycle handler - creates tables on startup, disposes engine on shutdown."""
+    logger.info("Starting up %s v%s (env=%s)", settings.APP_NAME, settings.APP_VERSION, settings.ENVIRONMENT)
     # Create all tables on startup (for development convenience)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -24,6 +32,7 @@ async def lifespan(application: FastAPI):
     # Close the rate limiter connection (e.g., Redis) if applicable
     from app.middleware.rate_limit import _limiter
     await _limiter.close()
+    logger.info("Shutdown complete")
 
 
 app = FastAPI(
@@ -34,6 +43,20 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
     lifespan=lifespan,
 )
+
+# ---------------------------------------------------------------------------
+# Global exception handlers (wrap errors in a consistent JSON envelope)
+# ---------------------------------------------------------------------------
+from app.utils.response import register_error_handlers
+
+register_error_handlers(app)
+
+# ---------------------------------------------------------------------------
+# Request ID middleware — attach a unique ID to every request
+# ---------------------------------------------------------------------------
+from app.middleware.request_id import RequestIDMiddleware
+
+app.add_middleware(RequestIDMiddleware)  # type: ignore[arg-type]
 
 # ---------------------------------------------------------------------------
 # CORS — allow the frontend origins
@@ -63,7 +86,7 @@ async def health_check():
         "version": settings.APP_VERSION,
         "app_name": settings.APP_NAME,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "environment": "production" if not settings.DEBUG else "development",
+        "environment": settings.ENVIRONMENT,
     }
 
 
