@@ -17,11 +17,9 @@ from app.database import get_db
 from app.main import app
 from app.models.base import Base
 
-# Set testing flag BEFORE importing app modules
+# Set testing flags BEFORE importing app modules
 os.environ["SOKO_TESTING"] = "1"
-
-# Use in-memory SQLite for tests
-TEST_DATABASE_URL = "sqlite+aiosqlite://"
+os.environ["SOKO_TEST_DATABASE_URL"] = "sqlite+aiosqlite://"
 
 
 @pytest.fixture(scope="session")
