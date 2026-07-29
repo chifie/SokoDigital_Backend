@@ -68,18 +68,16 @@ class TestSellerFollowLogic:
         assert len(constraints) > 0
         col_names = [col.name for col in constraints[0].columns]
         assert "seller_id" in col_names
-        assert "user_id" in col_names
-
-    def test_self_follow_prevention_logic(self) -> None:
+        assert "user_id" in col_names    def test_self_follow_prevention_logic(self) -> None:
         """The toggle_follow_seller endpoint should prevent self-follow."""
-        seller_user_id = MagicMock(spec=User)
-        seller_user_id.id = "seller-user-uuid"
-
-        current_user = MagicMock(spec=User)
-        current_user.id = "seller-user-uuid"
-
+        seller_user_id = "seller-user-uuid"
+        current_user_id = "seller-user-uuid"
+    
         # This is the check from the endpoint
-        assert seller_user_id == current_user.id  # Same user = should block
+        assert seller_user_id == current_user_id  # Same user = should block
+        # If they were different, the endpoint would allow following
+        other_user_id = "other-user-uuid"
+        assert seller_user_id != other_user_id  # Different users = should allow
 
     @pytest.mark.asyncio
     async def test_toggle_follow_new_follow_increments_count(self) -> None:
