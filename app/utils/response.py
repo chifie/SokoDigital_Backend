@@ -9,7 +9,6 @@ in error responses so existing API clients that parse ``response.detail``
 continue to work.
 """
 
-from collections.abc import Callable
 from typing import Any, Generic, TypeVar
 
 from fastapi import FastAPI, Request
