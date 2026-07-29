@@ -62,9 +62,6 @@ class Settings(BaseSettings):
     AI_MODEL: str = "gpt-4o-mini"
     AI_MAX_TOKENS: int = 1024
 
-    # Test database (optional — overrides DATABASE_URL for tests)
-    TEST_DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
-
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
