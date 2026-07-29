@@ -59,8 +59,7 @@ async def close_arq_pool() -> None:
     global _arq_pool
     if _arq_pool and _arq_pool is not False:
         try:
-            _arq_pool.close()
-            await _arq_pool.wait_closed()
+            await _arq_pool.close()
         except Exception:
             pass
         _arq_pool = None
