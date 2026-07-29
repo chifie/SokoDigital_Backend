@@ -69,11 +69,11 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          python -m pytest tests/ -v --tb=short -k "not test_email_verification" --cov-report=
+          python -m pytest tests/ -v --tb=short -k "not integration and not test_email_verification"
 
       - name: Run integration tests with PostgreSQL
         run: |
-          python -m pytest tests/test_email_verification.py -v --tb=short --cov-report=
+          python -m pytest tests/ -v --tb=short -k "integration or test_email_verification" --cov-append
         env:
           DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/sokodigital_test"
           SOKO_TESTING: ""

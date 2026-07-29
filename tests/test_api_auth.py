@@ -6,9 +6,11 @@ email verification, and protected route access.
 NOTE: These require a running PostgreSQL database with migrations applied.
 """
 
+import pytest
 from httpx import AsyncClient
 
 
+@pytest.mark.integration
 class TestAuthRegister:
     """Test user registration flow."""
 
@@ -61,6 +63,7 @@ class TestAuthRegister:
         assert resp.status_code == 422
 
 
+@pytest.mark.integration
 class TestAuthLogin:
     """Test user login flow."""
 
@@ -109,6 +112,7 @@ class TestAuthLogin:
         assert resp.status_code == 422
 
 
+@pytest.mark.integration
 class TestAuthProfile:
     """Test authenticated user profile endpoints."""
 
@@ -157,6 +161,7 @@ class TestAuthProfile:
         assert resp.json()["full_name"] == "Updated Name"
 
 
+@pytest.mark.integration
 class TestAuthProtectedEndpoints:
     """Test that various protected endpoints require authentication."""
 
