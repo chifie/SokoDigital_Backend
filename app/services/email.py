@@ -57,6 +57,25 @@ def _build_html(template_name: str, context: dict[str, Any]) -> str:
         </html>
         """
 
+    if template_name == "email_verification":
+        verify_url = context.get("verify_url", "#")
+        return f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2>Verify your email address ✅</h2>
+            <p>Thanks for joining SokoDigital! Please verify your email by clicking the button below.</p>
+            <p><a href="{verify_url}"
+                  style="background: #10b981; color: #fff; padding: 12px 24px;
+                         text-decoration: none; border-radius: 6px; display: inline-block;">
+                Verify Email</a></p>
+            <p>This link expires in 24 hours.</p>
+            <p>If you didn't create an account, you can safely ignore this email.</p>
+            <hr>
+            <p style="color: #999; font-size: 12px;">SokoDigital Marketplace</p>
+        </body>
+        </html>
+        """
+
     if template_name == "newsletter_welcome":
         return f"""
         <html>
@@ -97,6 +116,7 @@ def _build_html(template_name: str, context: dict[str, Any]) -> str:
 def _get_subject(template_name: str) -> str:
     subjects = {
         "welcome": "Welcome to SokoDigital! 🎉",
+        "email_verification": "Verify your email — SokoDigital",
         "order_confirmation": "Order Confirmed ✅ — SokoDigital",
         "newsletter_welcome": "Thanks for subscribing! 📬",
         "password_reset": "Password Reset — SokoDigital",
