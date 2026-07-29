@@ -353,3 +353,113 @@ async def resend_verification(
         pass
 
     return {"message": "Verification email sent. Please check your inbox."}
+
+
+# ── POST /auth/forgot-password ───────────────────────────────────────────────
+
+class ForgotPasswordSchema(BaseModel):
+    """Schema for requesting a password reset."""
+    email: EmailStr = Field(..., description="Email address to send reset link to")
+
+
+@router.post(
+    "/forgot-password",
+    summary="Request a password reset email",
+    responses={
+        200: {"description": "Reset email sent if account exists"},
+    },
+)
+async def forgot_password(
+    body: ForgotPasswordSchema,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Request a password reset email.
+
+    If an account with the given email exists, a password reset link
+    will be sent. For security, this endpoint always returns a success
+    message regardless of whether the email exists (to prevent email enumeration).
+    """
+    result = await db.execute(
+        select(User).where(User.email == body.email)
+    )
+    user = result.scalar_one_or_none()
+
+    if user is not None and user.is_active:
+        # Generate reset token (valid for 1 hour)
+        reset_token = uuid.uuid4().hex
+        reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        user.password_reset_token = reset_token
+        user.password_reset_token_expires_at = reset_token_expires_at
+        await db.commit()
+
+        # Send password reset email
+        reset_url = f"{settings.APP_URL}/reset-password?token={reset_token}&email={body.email}"
+        try:
+            await send_email(
+                to_email=body.email,
+                template_name="password_reset",
+                context={"reset_url": reset_url},
+            )
+        except Exception:
+            pass
+
+    # Always return success to prevent email enumeration
+    return {
+        "message": "If an account with that email exists, a password reset link has been sent."
+    }
+
+
+# ── POST /auth/reset-password ────────────────────────────────────────────────
+
+class ResetPasswordSchema(BaseModel):
+    """Schema for resetting password with a token."""
+    token: str = Field(..., description="Password reset token from email")
+    email: EmailStr = Field(..., description="Email address")
+    new_password: str = Field(..., min_length=6, max_length=255, description="New password")
+
+
+@router.post(
+    "/reset-password",
+    summary="Reset password using a reset token",
+    responses={
+        200: {"description": "Password reset successfully"},
+        400: {"description": "Invalid or expired reset token"},
+    },
+)
+async def reset_password(
+    body: ResetPasswordSchema,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset a user's password using a reset token.
+
+    The token is sent via email through the ``/auth/forgot-password`` endpoint.
+    Tokens expire after 1 hour.
+    """
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        select(User).where(
+            User.email == body.email,
+            User.password_reset_token == body.token,
+            User.password_reset_token_expires_at > now,
+            User.is_active == True,
+        )
+    )
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token. Please request a new one.",
+        )
+
+    # Update password and clear reset token
+    user.hashed_password = hash_password(body.new_password)
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
+    await db.commit()
+
+    return {"message": "Password has been reset successfully."}
