@@ -46,7 +46,7 @@ class InMemoryRateLimiter:
     def __init__(self) -> None:
         self._requests: dict[str, list[float]] = defaultdict(list)
 
-    def check(self, key: str, config: RateLimitConfig) -> bool:
+    async def check(self, key: str, config: RateLimitConfig) -> bool:
         """Check if a request is allowed. Returns True if allowed."""
         now = time.time()
         window_start = now - config.window_seconds
@@ -61,7 +61,7 @@ class InMemoryRateLimiter:
         self._requests[key].append(now)
         return True
 
-    def get_remaining(self, key: str, config: RateLimitConfig) -> int:
+    async def get_remaining(self, key: str, config: RateLimitConfig) -> int:
         """Get the number of remaining requests in the current window."""
         now = time.time()
         window_start = now - config.window_seconds
