@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "SokoDigital API"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    ENVIRONMENT: str = "development"  # development | staging | production
+
+    # Health check
+    HEALTH_CHECK_ENABLED: bool = True
 
     # API
     API_V1_PREFIX: str = "/api/v1"
@@ -40,6 +44,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
+        "http://localhost:8000",
     ]
 
     # Supabase (optional, for maintaining backward compatibility)
@@ -55,6 +60,9 @@ class Settings(BaseSettings):
 
     # Redis (optional, for distributed rate limiting & caching)
     REDIS_URL: Optional[str] = None
+
+    # Sentry (optional, for error tracking)
+    SENTRY_DSN: Optional[str] = None
 
     # AI (OpenAI-compatible)
     AI_API_KEY: Optional[str] = None
