@@ -197,6 +197,10 @@ async def update_me(
 @router.put(
     "/change-password",
     summary="Change the authenticated user's password",
+    responses={
+        200: {"description": "Password changed successfully"},
+        400: {"description": "Current password is incorrect"},
+    },
 )
 async def change_password(
     body: PasswordChangeSchema,
@@ -205,7 +209,8 @@ async def change_password(
 ):
     """Change the password for the currently authenticated user.
 
-    Requires the current password for verification.
+    Requires the **current password** for verification.
+    The new password must be at least 6 characters long.
     """
     if not verify_password(body.current_password, current_user.hashed_password):
         raise HTTPException(
@@ -216,3 +221,135 @@ async def change_password(
     current_user.hashed_password = hash_password(body.new_password)
     await db.commit()
     return {"message": "Password changed successfully"}
+
+
+# ── POST /auth/verify-email ──────────────────────────────────────────────────
+
+class EmailVerifySchema(BaseModel):
+    """Schema for email verification."""
+    token: str = Field(..., description="Verification token received in email")
+    email: EmailStr = Field(..., description="Email address to verify")
+
+
+@router.post(
+    "/verify-email",
+    summary="Verify email address with a token",
+    responses={
+        200: {"description": "Email verified successfully"},
+        400: {"description": "Invalid or expired verification token"},
+        404: {"description": "User not found"},
+    },
+)
+async def verify_email(
+    body: EmailVerifySchema,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Verify a user's email address using the token sent during registration.
+
+    The verification link is sent to the user's email upon registration.
+    Tokens expire after 24 hours.
+    """
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        select(User).where(
+            User.email == body.email,
+            User.verification_token == body.token,
+            User.verification_token_expires_at > now,
+        )
+    )
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        # Check if user exists but token is wrong/expired
+        user_check = await db.execute(
+            select(User).where(User.email == body.email)
+        )
+        user = user_check.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+        if user.is_verified:
+            return {"message": "Email already verified", "verified": True}
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token. Request a new one.",
+        )
+
+    if user.is_verified:
+        return {"message": "Email already verified", "verified": True}
+
+    user.is_verified = True
+    user.verification_token = None
+    user.verification_token_expires_at = None
+    await db.commit()
+
+    return {"message": "Email verified successfully", "verified": True}
+
+
+# ── POST /auth/resend-verification ───────────────────────────────────────────
+
+class ResendVerificationSchema(BaseModel):
+    """Schema for resending verification email."""
+    email: EmailStr
+
+
+@router.post(
+    "/resend-verification",
+    summary="Resend the email verification link",
+    responses={
+        200: {"description": "Verification email resent"},
+        400: {"description": "Email already verified"},
+        404: {"description": "User not found"},
+    },
+)
+async def resend_verification(
+    body: ResendVerificationSchema,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Resend the email verification link to a user's email address.
+
+    Use this if the original verification email was lost or the token expired.
+    A new token is generated, invalidating the previous one.
+    """
+    result = await db.execute(
+        select(User).where(User.email == body.email)
+    )
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found with this email",
+        )
+
+    if user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already verified",
+        )
+
+    # Generate new token
+    verification_token = uuid.uuid4().hex
+    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    user.verification_token = verification_token
+    user.verification_token_expires_at = verification_token_expires_at
+    await db.commit()
+
+    # Send verification email
+    verify_url = f"{settings.APP_URL}/verify-email?token={verification_token}&email={body.email}"
+    try:
+        await send_email(
+            to_email=body.email,
+            template_name="email_verification",
+            context={"verify_url": verify_url},
+        )
+    except Exception:
+        pass
+
+    return {"message": "Verification email sent. Please check your inbox."}
