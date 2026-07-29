@@ -77,9 +77,19 @@ async def register(body: UserRegister, db: AsyncSession = Depends(get_db)) -> Us
     "/login",
     response_model=TokenResponse,
     summary="Authenticate and receive a JWT access token",
+    responses={
+        200: {"description": "Login successful, returns JWT token"},
+        401: {"description": "Invalid credentials or account deactivated"},
+    },
 )
 async def login(body: UserLogin, db: AsyncSession = Depends(get_db)) -> dict:
-    """Authenticate with email/username + password and get an access token."""
+    """
+    Authenticate with email/username + password and get an access token.
+
+    The ``identity`` field accepts either an **email** or a **username**.
+    Returns a JWT ``access_token`` that should be sent in the ``Authorization``
+    header as ``Bearer <token>`` for authenticated requests.
+    """
     # Find user by email or username
     result = await db.execute(
         select(User).where(
