@@ -2,7 +2,7 @@
 
 A production-grade **e-commerce marketplace backend** built with **FastAPI**, **SQLAlchemy** (async), **PostgreSQL**, and **Redis**.
 
-## 🚀 Quick Start
+## 🚀 Quick Star
 
 ```bash
 # Clone & setup
