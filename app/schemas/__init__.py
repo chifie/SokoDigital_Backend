@@ -1,3 +1,5 @@
+from app.schemas.common import Page
+
 from app.schemas.ai import (
     ChatMessage,
     ChatRequest,
@@ -64,6 +66,7 @@ from app.schemas.shopping import (
 )
 
 __all__ = [
+    "Page",
     "ChatMessage",
     "ChatRequest",
     "ChatResponse",
