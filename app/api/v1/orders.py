@@ -12,6 +12,7 @@ from app.models.product import Product
 from app.models.seller import Seller
 from app.models.shopping import Address, Order, OrderItem
 from app.models.user import User
+from app.schemas.common import Page
 from app.schemas.shopping import (
     CheckoutRequest,
     OrderResponse,
