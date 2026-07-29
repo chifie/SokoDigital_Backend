@@ -47,10 +47,43 @@ async def lifespan(application: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
+    description="""
+    SokoDigital Marketplace API — a full-featured e-commerce backend.
+
+    ## Rate Limiting
+    Auth endpoints are rate-limited to **10 requests/minute** per IP.
+    Upload endpoints are rate-limited to **20 requests/minute** per IP.
+    All other endpoints are limited to **100 requests/minute** per IP.
+    When rate-limited, the response includes `Retry-After`, `X-RateLimit-Limit`,
+    and `X-RateLimit-Remaining` headers.
+
+    ## Response Caching
+    Successful `GET` responses are cached in Redis for **60 seconds** (default).
+    Cache hits return `X-Cache: HIT`; misses return `X-Cache: MISS`.
+    Cached responses bypass the route handler entirely for faster response times.
+
+    ## Authentication
+    Most endpoints require a JWT access token sent as `Authorization: Bearer <token>`.
+    Obtain a token via `POST /api/v1/auth/login`.
+
+    ## Error Format
+    All errors follow a consistent JSON envelope:
+    ```json
+    {"success": false, "message": "...", "detail": "...", "error": "..."}
+    ```
+    The `detail` key is preserved for backward compatibility with standard FastAPI clients.
+    """.strip(),
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
     lifespan=lifespan,
+    contact={
+        "name": "SokoDigital Support",
+        "email": "support@sokodigital.com",
+    },
+    license_info={
+        "name": "MIT",
+    },
 )
 
 # ---------------------------------------------------------------------------
