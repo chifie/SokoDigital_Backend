@@ -8,11 +8,8 @@ rate limiting (e.g., using slowapi or a custom Redis-backed limiter).
 import time
 from collections import defaultdict
 from collections.abc import Callable
-from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.responses import Response
+from fastapi import Depends, HTTPException, Request, status
 
 
 class RateLimitConfig:
