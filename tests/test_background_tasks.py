@@ -206,17 +206,12 @@ class TestEnqueueEmail:
         mock_job.job_id = "job_123"
         mock_pool.enqueue_job.return_value = mock_job
 
-        # Mock arq import so the function can find it
+        # Mock arq in sys.modules so function-body imports resolve at call time
         with (
             patch.dict("sys.modules", {"arq": MagicMock()}),
             patch("app.tasks._get_arq_pool", return_value=mock_pool),
         ):
-            # Re-import the module so it uses the mocked arq
-            import importlib
-            import app.tasks
-            importlib.reload(app.tasks)
-
-            result = await app.tasks.enqueue_email(
+            result = await enqueue_email(
                 to_email="test@example.com",
                 template_name="welcome",
             )
@@ -274,11 +269,7 @@ class TestEnqueueCacheInvalidation:
             patch("app.tasks._get_arq_pool", return_value=mock_pool),
             patch("app.tasks.invalidate_cache_task", new_callable=AsyncMock) as mock_inline,
         ):
-            import importlib
-            import app.tasks
-            importlib.reload(app.tasks)
-
-            result = await app.tasks.enqueue_cache_invalidation(pattern="prod:*")
+            result = await enqueue_cache_invalidation(pattern="prod:*")
 
         assert result == 0  # Unknown until task runs
         mock_pool.enqueue_job.assert_awaited_once_with(
