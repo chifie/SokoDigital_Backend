@@ -5,10 +5,12 @@ Revises: 92c79a66f099
 Create Date: 2026-07-29 13:00:00.000000
 
 Insert seed data for local development:
-- Admin user
-- Product categories (Electronics, Fashion, Home, etc.)
-- Sample seller
-- Sample products
+- Admin user (admin@sokodigital.com / admin123)
+- Seller user (seller@sokodigital.com / seller123)
+- Customer user (customer@example.com / customer123)
+- Seller profile (TechZone Africa)
+- 6 product categories
+- 4 sample products
 """
 from typing import Sequence, Union
 
@@ -34,6 +36,16 @@ def _uuid(val: str) -> uuid.UUID:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _hash_password(password: str) -> str:
+    """Generate a bcrypt hash for the given password at migration time.
+
+    Uses passlib (already in requirements.txt) to create a real bcrypt
+    hash so the seed users can actually log in.
+    """
+    from passlib.hash import bcrypt
+    return bcrypt.hash(password)
 
 
 # ── Data ─────────────────────────────────────────────────────────────────────
@@ -134,9 +146,13 @@ PRODUCTS = [
 def upgrade() -> None:
     connection = op.get_bind()
 
+    # ── Generate real bcrypt hashes at migration time ──────────────────────
+    # Users can log in with the passwords shown in the docstring.
+    admin_hash = _hash_password("admin123")
+    seller_hash = _hash_password("seller123")
+    customer_hash = _hash_password("customer123")
+
     # ── 1. Admin User ──────────────────────────────────────────────────────
-    # Password: "admin123" (bcrypt hash)
-    admin_hash = "$2b$12$LJ3m4ys3Lg3YOCwKkR.KcOX5pEDl7Zw7q5o7H0gN0Y0l0q0r0s0u"
     connection.execute(
         sa.text(
             """
@@ -159,8 +175,6 @@ def upgrade() -> None:
     )
 
     # ── 2. Seller User ────────────────────────────────────────────────────
-    # Password: "seller123"
-    seller_hash = "$2b$12$LJ3m4ys3Lg3YOCwKkR.KcOX5pEDl7Zw7q5o7H0gN0Y0l0q0r0s0u"
     connection.execute(
         sa.text(
             """
@@ -183,7 +197,6 @@ def upgrade() -> None:
     )
 
     # ── 3. Customer User ──────────────────────────────────────────────────
-    # Password: "customer123"
     customer_id = _uuid("00000000-0000-0000-0000-000000000003")
     connection.execute(
         sa.text(
@@ -197,7 +210,7 @@ def upgrade() -> None:
             "id": customer_id,
             "email": "customer@example.com",
             "username": "customer1",
-            "password": seller_hash,
+            "password": customer_hash,
             "full_name": "Test Customer",
             "role": "customer",
             "active": True,
