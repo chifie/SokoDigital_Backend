@@ -59,7 +59,8 @@ test-all: ## Run all tests (unit + integration; requires running PostgreSQL)
 	$(PYTEST) tests/ -v --tb=short
 
 test-e2e: ## Run full test suite in Docker (isolated, ephemeral, reproducible)
-	$(DOCKER_COMPOSE) -f docker-compose.test.yml up --build --abort-on-container-exit
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml up --build \
+		--abort-on-container-exit --exit-code-from test-runner
 
 test-e2e-down: ## Tear down the E2E test infrastructure and clean volumes
 	$(DOCKER_COMPOSE) -f docker-compose.test.yml down --volumes

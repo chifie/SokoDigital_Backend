@@ -22,8 +22,9 @@ from fastapi import Request
 from fastapi.responses import PlainTextResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-from starlette.routing import Match
 from starlette.types import ASGIApp
+
+from app.middleware import get_route_path
 
 try:
     from prometheus_client import Counter, Gauge, Histogram, generate_latest, REGISTRY
@@ -124,11 +125,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     @staticmethod
     def _get_route_path(request: Request) -> str:
         """Extract the route template from the request, falling back to the URL path."""
-        for route in request.app.routes:
-            match, _ = route.matches(request.scope)
-            if match == Match.FULL:
-                return route.path  # e.g. /api/v1/products/{product_id}
-        return request.url.path
+        return get_route_path(request)
 
 
 # ── Metrics endpoint ─────────────────────────────────────────────────────────

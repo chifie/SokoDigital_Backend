@@ -17,15 +17,16 @@ Usage in ``main.py``::
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.routing import Match
 from starlette.types import ASGIApp
 
 from app.config import settings
+from app.middleware import get_route_path
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ def setup_tracing(service_name: str = "sokodigital-api") -> None:
         )
         return
 
-    otel_endpoint = __import__("os").environ.get(
+    otel_endpoint = os.environ.get(
         "OTEL_EXPORTER_OTLP_ENDPOINT",
         "http://localhost:4318",
     )
@@ -183,8 +184,4 @@ class TracingMiddleware(BaseHTTPMiddleware):
     @staticmethod
     def _get_route_path(request: Request) -> str:
         """Extract the route template from the request."""
-        for route in request.app.routes:
-            match, _ = route.matches(request.scope)
-            if match == Match.FULL:
-                return route.path
-        return request.url.path
+        return get_route_path(request)
