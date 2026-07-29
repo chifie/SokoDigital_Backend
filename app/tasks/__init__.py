@@ -8,17 +8,15 @@ Usage — start the worker::
 
     arq app.tasks.WorkerSettings
 
-Or connect from your application code::
+Or use the enqueue helpers from your route handlers::
 
     from app.tasks import enqueue_email
-    await enqueue_email(ctx, to_email=\"a@b.com\", template=\"welcome\", context={...})
+    await enqueue_email(to_email="a@b.com", template="welcome", context={...})
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from typing import Any
 
 from app.config import settings
@@ -27,28 +25,45 @@ from app.services.email import send_email as _send_email
 logger = logging.getLogger(__name__)
 
 
-# ── Redis connection for ARQ ─────────────────────────────────────────────────
+# ── Lazy Redis client for ARQ ───────────────────────────────────────────────
 
 
-@asynccontextmanager
-async def _redis_pool() -> AsyncGenerator[Any, None]:
-    """Yield a Redis connection for ARQ (or ``None`` if unavailable)."""
-    r = None
-    try:
-        import redis.asyncio as aioredis
+_arq_pool: Any = None
 
-        if settings.REDIS_URL:
+
+async def _get_arq_pool() -> Any:
+    """Return a shared ARQ connection pool (lazy-init)."""
+    global _arq_pool
+    if _arq_pool is None and settings.REDIS_URL:
+        try:
+            import arq
+            import redis.asyncio as aioredis
+
             r = aioredis.from_url(
                 settings.REDIS_URL,
                 encoding="utf-8",
                 decode_responses=True,
             )
-            yield r
-        else:
-            yield None
-    finally:
-        if r is not None:
-            await r.close()
+            _arq_pool = await arq.create_pool(r)
+            logger.info("ARQ pool created")
+        except Exception as exc:
+            logger.warning("ARQ pool init failed: %s", exc)
+            _arq_pool = False  # Sentinel
+    elif _arq_pool is None:
+        _arq_pool = False
+    return _arq_pool if _arq_pool is not False else None
+
+
+async def close_arq_pool() -> None:
+    """Close the shared ARQ pool."""
+    global _arq_pool
+    if _arq_pool and _arq_pool is not False:
+        try:
+            _arq_pool.close()
+            await _arq_pool.wait_closed()
+        except Exception:
+            pass
+        _arq_pool = None
 
 
 # ── Task functions ───────────────────────────────────────────────────────────
@@ -60,12 +75,7 @@ async def send_email_task(
     template_name: str,
     context: dict[str, Any] | None = None,
 ) -> bool:
-    """Send an email in the background.
-
-    The actual SMTP call fires synchronously in a thread via
-    ``asyncio.to_thread``, so it won't block the event loop even
-    without a dedicated worker.
-    """
+    """Send an email in the background."""
     logger.info("Task: sending %s email to %s", template_name, to_email)
     try:
         return await _send_email(to_email, template_name, context or {})
@@ -90,12 +100,19 @@ async def invalidate_cache_task(
 
     Returns the number of deleted keys.
     """
-    async with _redis_pool() as r:
-        if r is None:
-            logger.warning("Task: cache invalidation skipped — no Redis")
-            return 0
+    if not settings.REDIS_URL:
+        logger.warning("Task: cache invalidation skipped — no Redis")
+        return 0
 
-        try:
+    try:
+        import redis.asyncio as aioredis
+
+        r = aioredis.from_url(
+            settings.REDIS_URL,
+            encoding="utf-8",
+            decode_responses=True,
+        )
+        async with r:
             if pattern:
                 keys = await r.keys(pattern)
             elif key_prefix:
@@ -108,9 +125,9 @@ async def invalidate_cache_task(
                 logger.info("Task: invalidated %d cache keys", deleted)
                 return deleted
             return 0
-        except Exception as exc:
-            logger.error("Task: cache invalidation error: %s", exc)
-            return 0
+    except Exception as exc:
+        logger.error("Task: cache invalidation error: %s", exc)
+        return 0
 
 
 # ── Enqueue helpers (call these from route handlers) ─────────────────────────
@@ -125,19 +142,20 @@ async def enqueue_email(
     try:
         import arq
 
-        async with _redis_pool() as r:
-            if r is not None:
-                pool = await arq.create_pool(r)
-                job = await pool.enqueue_job(
-                    "send_email_task",
-                    to_email,
-                    template_name,
-                    context or {},
-                )
-                logger.info("Enqueued email job %s", job.job_id)
-                return True
-    except (ImportError, Exception) as exc:
-        logger.warning("ARQ not available, sending email synchronously (%s)", exc)
+        pool = await _get_arq_pool()
+        if pool is not None:
+            job = await pool.enqueue_job(
+                "send_email_task",
+                to_email,
+                template_name,
+                context or {},
+            )
+            logger.info("Enqueued email job %s", job.job_id)
+            return True
+    except ImportError:
+        logger.warning("ARQ not installed, sending email synchronously")
+    except Exception as exc:
+        logger.warning("ARQ enqueue failed, sending email synchronously (%s)", exc)
 
     # Fallback: send directly
     return await _send_email(to_email, template_name, context or {})
@@ -151,28 +169,47 @@ async def enqueue_cache_invalidation(
     try:
         import arq
 
-        async with _redis_pool() as r:
-            if r is not None:
-                pool = await arq.create_pool(r)
-                job = await pool.enqueue_job(
-                    "invalidate_cache_task",
-                    key_prefix,
-                    pattern,
-                )
-                logger.info("Enqueued cache invalidation job %s", job.job_id)
-                return 0  # Result unknown until task runs
-    except (ImportError, Exception) as exc:
-        logger.warning("ARQ not available, invalidating cache inline (%s)", exc)
+        pool = await _get_arq_pool()
+        if pool is not None:
+            job = await pool.enqueue_job(
+                "invalidate_cache_task",
+                key_prefix,
+                pattern,
+            )
+            logger.info("Enqueued cache invalidation job %s", job.job_id)
+            return 0  # Result unknown until task runs
+    except ImportError:
+        logger.warning("ARQ not installed, invalidating cache inline")
+    except Exception as exc:
+        logger.warning("ARQ enqueue failed, invalidating cache inline (%s)", exc)
 
-    # Fallback: run inline
-    return await invalidate_cache_task(
-        {"redis": await _redis_pool().__aenter__()},
-        key_prefix,
-        pattern,
-    )
+    # Fallback: run inline (non-ctx version)
+    return await invalidate_cache_task({}, key_prefix, pattern)
 
 
 # ── ARQ WorkerSettings (used by ``arq run``) ─────────────────────────────────
+
+
+def _get_redis_settings() -> Any:
+    """Parse REDIS_URL into ARQ RedisSettings."""
+    if not settings.REDIS_URL:
+        raise RuntimeError(
+            "REDIS_URL is not configured. Set it in your .env or environment."
+        )
+
+    try:
+        from arq.connections import RedisSettings
+        from urllib.parse import urlparse
+
+        parsed = urlparse(settings.REDIS_URL)
+        return RedisSettings(
+            host=parsed.hostname or "localhost",
+            port=parsed.port or 6379,
+            database=int(parsed.path.lstrip("/")) if parsed.path and parsed.path != "/" else 0,
+            password=parsed.password,
+        )
+    except ImportError:
+        raise RuntimeError("arq is not installed. Run: pip install arq")
 
 
 class WorkerSettings:
@@ -190,36 +227,7 @@ class WorkerSettings:
     """
 
     functions: list[Any] = [send_email_task, invalidate_cache_task]
-    redis_settings: Any = None  # Configured at runtime from settings
-
-    @classmethod
-    def _get_redis_settings(cls) -> Any:
-        """Lazy-load Redis settings from the app config."""
-        if not settings.REDIS_URL:
-            raise RuntimeError(
-                "REDIS_URL is not configured. Set it in your .env or environment."
-            )
-
-        try:
-            from arq.connections import RedisSettings
-
-            # Parse the REDIS_URL to extract host/port/db
-            from urllib.parse import urlparse
-
-            parsed = urlparse(settings.REDIS_URL)
-            host = parsed.hostname or "localhost"
-            port = parsed.port or 6379
-            db = int(parsed.path.lstrip("/")) if parsed.path and parsed.path != "/" else 0
-            password = parsed.password
-
-            return RedisSettings(
-                host=host,
-                port=port,
-                database=db,
-                password=password,
-            )
-        except ImportError:
-            raise RuntimeError("arq is not installed. Run: pip install arq")
+    redis_settings: Any
 
     def __init__(self) -> None:
-        self.redis_settings = self._get_redis_settings()
+        self.redis_settings = _get_redis_settings()
