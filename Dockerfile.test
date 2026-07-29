@@ -1,0 +1,33 @@
+# ── Builder stage ─────────────────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# ── Runtime stage ────────────────────────────────────────────────────────────
+FROM python:3.12-slim AS runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Install test dependencies
+RUN pip install --no-cache-dir ruff mypy pytest pytest-asyncio httpx
+
+# Copy full application code
+COPY . .
+
+# Ensure scripts are executable
+RUN chmod +x scripts/*.sh entrypoint.sh 2>/dev/null || true
+
+# Create test results directory
+RUN mkdir -p /app/test-results
