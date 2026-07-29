@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 
 from app.api.dependencies import get_current_user
 from app.config import settings
+from app.middleware.rate_limit import UPLOAD_RATE_LIMIT, rate_limit
 from app.models.user import User
 
 router = APIRouter(prefix="/uploads", tags=["Uploads"])
