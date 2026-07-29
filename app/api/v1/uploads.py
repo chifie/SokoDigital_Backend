@@ -40,6 +40,7 @@ def _ensure_upload_dir(subdir: str = "") -> Path:
 async def upload_image(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(rate_limit(UPLOAD_RATE_LIMIT)),
 ):
     """Upload an image file (JPEG, PNG, GIF, WebP, SVG).
 
@@ -59,6 +60,7 @@ async def upload_image(
 async def upload_document(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(rate_limit(UPLOAD_RATE_LIMIT)),
 ):
     """Upload a document file (PDF, TXT, CSV).
 
@@ -78,6 +80,7 @@ async def upload_document(
 async def upload_any(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(rate_limit(UPLOAD_RATE_LIMIT)),
 ):
     """Upload an image or document file.
 
