@@ -36,7 +36,15 @@ def _ensure_upload_dir(subdir: str = "") -> Path:
     return target
 
 
-@router.post("/image", summary="Upload an image file")
+@router.post(
+    "/image",
+    summary="Upload an image file",
+    response_description="URL and metadata of the uploaded image",
+    responses={
+        400: {"description": "Unsupported image type"},
+        413: {"description": "File too large"},
+    },
+)
 async def upload_image(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
@@ -56,7 +64,15 @@ async def upload_image(
     return await _save_upload(file, "images")
 
 
-@router.post("/document", summary="Upload a document file")
+@router.post(
+    "/document",
+    summary="Upload a document file",
+    response_description="URL and metadata of the uploaded document",
+    responses={
+        400: {"description": "Unsupported document type"},
+        413: {"description": "File too large"},
+    },
+)
 async def upload_document(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
@@ -76,7 +92,15 @@ async def upload_document(
     return await _save_upload(file, "documents")
 
 
-@router.post("/any", summary="Upload any allowed file type")
+@router.post(
+    "/any",
+    summary="Upload an image or document file",
+    response_description="URL and metadata of the uploaded file",
+    responses={
+        400: {"description": "Unsupported file type"},
+        413: {"description": "File too large"},
+    },
+)
 async def upload_any(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
