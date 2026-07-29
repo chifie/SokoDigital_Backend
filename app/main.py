@@ -309,6 +309,7 @@ from app.api.v1 import reviews as reviews_router
 from app.api.v1 import seller_follow as seller_follow_router
 from app.api.v1 import sellers as sellers_router
 from app.api.v1 import uploads as uploads_router
+from app.api.v1 import webhooks as webhooks_router
 from app.api.v1 import wishlist as wishlist_router
 
 app.include_router(addresses_router.router, prefix=settings.API_V1_PREFIX)
@@ -330,4 +331,5 @@ app.include_router(reviews_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(seller_follow_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sellers_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(uploads_router.router, prefix=settings.API_V1_PREFIX)
+app.include_router(webhooks_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(wishlist_router.router, prefix=settings.API_V1_PREFIX)
