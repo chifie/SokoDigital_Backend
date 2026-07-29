@@ -13,9 +13,9 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from app.database import get_db
 from app.main import app
 
 
