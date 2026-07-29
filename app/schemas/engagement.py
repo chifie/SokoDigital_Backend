@@ -44,6 +44,18 @@ class CouponValidateResponse(BaseModel):
     discount: float | None = None
 
 
+class CouponUpdate(BaseModel):
+    """Schema for updating a coupon."""
+    code: str | None = Field(None, max_length=50)
+    type: str | None = Field(None, pattern=r"^(percentage|fixed)$")
+    value: float | None = Field(None, gt=0)
+    min_purchase: float | None = None
+    max_uses: int | None = None
+    expires_at: datetime | None = None
+    is_active: bool | None = None
+    applicable_categories: list[str] | None = None
+
+
 # ── FlashSale ───────────────────────────────────────────────────────────────
 class FlashSaleCreate(BaseModel):
     title: str = Field(..., max_length=255)
@@ -51,6 +63,17 @@ class FlashSaleCreate(BaseModel):
     discount: int = Field(..., ge=1, le=100)
     start_time: datetime
     end_time: datetime
+    product_ids: list[str] | None = None
+
+
+class FlashSaleUpdate(BaseModel):
+    """Schema for updating a flash sale."""
+    title: str | None = Field(None, max_length=255)
+    description: str | None = None
+    discount: int | None = Field(None, ge=1, le=100)
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    is_active: bool | None = None
     product_ids: list[str] | None = None
 
 
@@ -85,6 +108,27 @@ class BannerCreate(BaseModel):
     priority: int = 0
     bg_color: str | None = None
     text_color: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+
+
+class BannerUpdate(BaseModel):
+    """Schema for updating a banner."""
+    title: str | None = Field(None, max_length=255)
+    subtitle: str | None = None
+    description: str | None = None
+    cta: str | None = None
+    link: str | None = None
+    desktop_image: str | None = None
+    mobile_image: str | None = None
+    badge: str | None = None
+    discount: int | None = None
+    countdown_to: datetime | None = None
+    type: str | None = None
+    priority: int | None = None
+    bg_color: str | None = None
+    text_color: str | None = None
+    is_active: bool | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None
 

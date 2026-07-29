@@ -14,6 +14,20 @@ from app.schemas.shopping import ReviewCreate, ReviewResponse, ReviewUpdate
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
 
+@router.get("/mine", response_model=list[ReviewResponse], summary="Get my reviews")
+async def list_my_reviews(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return all reviews written by the currently authenticated user."""
+    result = await db.execute(
+        select(Review)
+        .where(Review.user_id == current_user.id)
+        .order_by(Review.created_at.desc())
+    )
+    return result.scalars().all()
+
+
 @router.get("/product/{product_id}", response_model=list[ReviewResponse], summary="Get reviews for a product")
 async def list_product_reviews(
     product_id: uuid.UUID,

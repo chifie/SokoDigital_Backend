@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import engine
@@ -49,6 +51,14 @@ async def health_check():
 
 
 # ---------------------------------------------------------------------------
+# Static files (serving uploaded files)
+# ---------------------------------------------------------------------------
+upload_dir = Path(settings.UPLOAD_DIR)
+upload_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
+
+
+# ---------------------------------------------------------------------------
 # API v1 routers
 # ---------------------------------------------------------------------------
 from app.api.v1 import addresses as addresses_router
@@ -61,7 +71,9 @@ from app.api.v1 import messaging as messaging_router
 from app.api.v1 import orders as orders_router
 from app.api.v1 import products as products_router
 from app.api.v1 import reviews as reviews_router
+from app.api.v1 import seller_follow as seller_follow_router
 from app.api.v1 import sellers as sellers_router
+from app.api.v1 import uploads as uploads_router
 from app.api.v1 import wishlist as wishlist_router
 
 app.include_router(addresses_router.router, prefix=settings.API_V1_PREFIX)
@@ -80,5 +92,7 @@ app.include_router(engagement_router.notification_router, prefix=settings.API_V1
 app.include_router(orders_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(products_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reviews_router.router, prefix=settings.API_V1_PREFIX)
+app.include_router(seller_follow_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(sellers_router.router, prefix=settings.API_V1_PREFIX)
+app.include_router(uploads_router.router, prefix=settings.API_V1_PREFIX)
 app.include_router(wishlist_router.router, prefix=settings.API_V1_PREFIX)

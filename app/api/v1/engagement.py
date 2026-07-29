@@ -9,15 +9,19 @@ from app.api.dependencies import get_current_user, require_admin
 from app.database import get_db
 from app.models.engagement import Banner, Coupon, FlashSale, Notification
 from app.models.user import User
+
 from app.schemas.engagement import (
     BannerCreate,
     BannerResponse,
+    BannerUpdate,
     CouponCreate,
     CouponResponse,
+    CouponUpdate,
     CouponValidateRequest,
     CouponValidateResponse,
     FlashSaleCreate,
     FlashSaleResponse,
+    FlashSaleUpdate,
     NotificationResponse,
     NotificationUnreadCount,
 )
@@ -97,6 +101,47 @@ async def create_coupon(
     return coupon
 
 
+@coupon_router.put("/{coupon_id}", response_model=CouponResponse, summary="Update a coupon (admin)")
+async def update_coupon(
+    coupon_id: uuid.UUID,
+    body: CouponUpdate,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    result = await db.execute(select(Coupon).where(Coupon.id == coupon_id))
+    coupon = result.scalar_one_or_none()
+    if coupon is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    if body.code is not None and body.code != coupon.code:
+        existing = await db.execute(select(Coupon).where(Coupon.code == body.code))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Coupon code already exists")
+
+    update_data = body.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(coupon, field, value)
+
+    await db.commit()
+    await db.refresh(coupon)
+    return coupon
+
+
+@coupon_router.delete("/{coupon_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a coupon (admin)")
+async def delete_coupon(
+    coupon_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    result = await db.execute(select(Coupon).where(Coupon.id == coupon_id))
+    coupon = result.scalar_one_or_none()
+    if coupon is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+
+    await db.delete(coupon)
+    await db.commit()
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # FLASH SALES
 # ═══════════════════════════════════════════════════════════════════════════
@@ -133,6 +178,42 @@ async def create_flash_sale(
     return flash_sale
 
 
+@flash_sale_router.put("/{flash_sale_id}", response_model=FlashSaleResponse, summary="Update a flash sale (admin)")
+async def update_flash_sale(
+    flash_sale_id: uuid.UUID,
+    body: FlashSaleUpdate,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    result = await db.execute(select(FlashSale).where(FlashSale.id == flash_sale_id))
+    flash_sale = result.scalar_one_or_none()
+    if flash_sale is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flash sale not found")
+
+    update_data = body.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(flash_sale, field, value)
+
+    await db.commit()
+    await db.refresh(flash_sale)
+    return flash_sale
+
+
+@flash_sale_router.delete("/{flash_sale_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a flash sale (admin)")
+async def delete_flash_sale(
+    flash_sale_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    result = await db.execute(select(FlashSale).where(FlashSale.id == flash_sale_id))
+    flash_sale = result.scalar_one_or_none()
+    if flash_sale is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flash sale not found")
+
+    await db.delete(flash_sale)
+    await db.commit()
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # BANNERS
 # ═══════════════════════════════════════════════════════════════════════════
@@ -167,6 +248,42 @@ async def create_banner(
     await db.commit()
     await db.refresh(banner)
     return banner
+
+
+@banner_router.put("/{banner_id}", response_model=BannerResponse, summary="Update a banner (admin)")
+async def update_banner(
+    banner_id: uuid.UUID,
+    body: BannerUpdate,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    result = await db.execute(select(Banner).where(Banner.id == banner_id))
+    banner = result.scalar_one_or_none()
+    if banner is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found")
+
+    update_data = body.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(banner, field, value)
+
+    await db.commit()
+    await db.refresh(banner)
+    return banner
+
+
+@banner_router.delete("/{banner_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a banner (admin)")
+async def delete_banner(
+    banner_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    result = await db.execute(select(Banner).where(Banner.id == banner_id))
+    banner = result.scalar_one_or_none()
+    if banner is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found")
+
+    await db.delete(banner)
+    await db.commit()
 
 
 # ═══════════════════════════════════════════════════════════════════════════

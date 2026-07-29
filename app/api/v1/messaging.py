@@ -195,23 +195,4 @@ async def get_messages(
             msg.read = True
     await db.commit()
 
-    return messages
 
-
-# ── GET /conversations/unread/count ─────────────────────────────────────────
-@router.get("/unread/count", summary="Get unread message count across all conversations")
-async def unread_message_count(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Count messages that are unread and not sent by the current user."""
-    result = await db.execute(
-        select(func.count(Message.id))
-        .join(Conversation, Message.conversation_id == Conversation.id)
-        .where(
-            Conversation.participant_ids.any(current_user.id),
-            Message.read == False,
-            Message.sender_id != current_user.id,
-        )
-    )
-    return {"unread_count": result.scalar() or 0}
