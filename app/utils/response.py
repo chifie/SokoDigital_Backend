@@ -57,17 +57,9 @@ def error_response(
 
     The ``detail`` key is included as an alias of ``message`` for
     backward compatibility with clients that parse FastAPI's standard
-    ``{\"detail\": \"...\"}`` error format.
+    ``{"detail": "..."}`` error format.
     """
-    return APIResponse(
-        success=False, message=message, error=error, detail=message  # type: ignore[call-arg]
-    ).model_dump(exclude_none=True)
-
-
-# NOTE: `detail` is dynamically added to the model_dump via the alias above.
-# Unfortunately BaseModel doesn't support arbitrary extra fields at runtime
-# without `model_config = ConfigDict(extra='allow')`. Instead we'll build
-# the dict manually to guarantee backward compat.
+    return _build_error_body(message=message, error=error)
 
 
 def _build_error_body(
