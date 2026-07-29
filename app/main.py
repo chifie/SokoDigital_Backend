@@ -4,6 +4,7 @@ from pathlib import Path
 
 from datetime import datetime, timezone
 
+import sqlalchemy
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -135,15 +136,64 @@ async def health_check():
     Health check endpoint.
 
     Returns the current service status, version, and a timestamp.
+    Pings PostgreSQL and Redis (if configured) to verify connectivity.
     Used by Docker HEALTHCHECK and monitoring systems.
+
+    Returns ``503 Service Unavailable`` if any required dependency is down.
     """
-    return {
-        "status": "ok",
-        "version": settings.APP_VERSION,
-        "app_name": settings.APP_NAME,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "environment": settings.ENVIRONMENT,
+    from fastapi.responses import JSONResponse
+
+    checks: dict[str, str | bool] = {
+        "database": False,
+        "redis": False,
     }
+
+    # ── Ping PostgreSQL ─────────────────────────────────────────────────
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(
+                sqlalchemy.text("SELECT 1")
+            )
+        checks["database"] = True
+    except Exception as exc:
+        checks["database"] = f"unreachable: {exc}"
+
+    # ── Ping Redis (if configured) ──────────────────────────────────────
+    if settings.REDIS_URL:
+        try:
+            import redis.asyncio as aioredis
+
+            r = aioredis.from_url(
+                settings.REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True,
+                socket_connect_timeout=2,
+            )
+            await r.ping()
+            await r.close()
+            checks["redis"] = True
+        except Exception as exc:
+            checks["redis"] = f"unreachable: {exc}"
+    else:
+        checks["redis"] = "not configured"
+
+    all_ok = (
+        checks["database"] is True
+        and (checks["redis"] is True or checks["redis"] == "not configured")
+    )
+
+    status_code = 200 if all_ok else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ok" if all_ok else "degraded",
+            "version": settings.APP_VERSION,
+            "app_name": settings.APP_NAME,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "environment": settings.ENVIRONMENT,
+            "checks": checks,
+        },
+    )
 
 
 @app.get("/api", summary="API version information")
