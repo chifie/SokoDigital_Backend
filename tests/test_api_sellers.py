@@ -6,6 +6,7 @@ and follower counts.
 NOTE: These require a running PostgreSQL database with migrations applied.
 """
 
+import pytest
 from httpx import AsyncClient
 
 
@@ -29,6 +30,7 @@ async def _register_and_login(client: AsyncClient) -> tuple[str, str]:
     return token, user_data["email"]
 
 
+@pytest.mark.integration
 class TestSellersPublic:
     """Test public seller listing endpoints."""
 
@@ -51,6 +53,7 @@ class TestSellersPublic:
         assert resp.status_code == 404
 
 
+@pytest.mark.integration
 class TestSellerOnboarding:
     """Test seller onboarding flow."""
 
@@ -80,6 +83,7 @@ class TestSellerOnboarding:
         assert resp.status_code == 401
 
 
+@pytest.mark.integration
 class TestSellerFollow:
     """Test seller follow/unfollow endpoints."""
 

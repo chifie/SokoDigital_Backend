@@ -11,6 +11,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 
+@pytest.mark.integration
 class TestHealthEndpoint:
     """Test /health endpoint behavior."""
 
@@ -97,6 +98,7 @@ class TestHealthEndpoint:
         assert "api_prefix" in data
 
 
+@pytest.mark.integration
 class TestMetricsEndpoint:
     """Test /metrics endpoint."""
 
@@ -118,6 +120,7 @@ class TestMetricsEndpoint:
         assert "requests_total" in text or "# HELP" in text or "# TYPE" in text
 
 
+@pytest.mark.integration
 class TestDocsEndpoints:
     """Test documentation endpoints."""
 

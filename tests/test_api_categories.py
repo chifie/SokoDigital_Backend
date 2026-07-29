@@ -5,9 +5,11 @@ Tests both public listing and admin CRUD operations.
 NOTE: These require a running PostgreSQL database with migrations applied.
 """
 
+import pytest
 from httpx import AsyncClient
 
 
+@pytest.mark.integration
 class TestCategoriesPublic:
     """Test public category listing endpoints."""
 
@@ -64,6 +66,7 @@ class TestCategoriesPublic:
         assert resp.status_code == 404
 
 
+@pytest.mark.integration
 class TestCategoriesAdmin:
     """Test admin category management endpoints."""
 
