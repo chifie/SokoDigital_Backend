@@ -31,7 +31,8 @@ def anyio_backend() -> str:
 @pytest_asyncio.fixture(scope="session")
 async def test_engine():
     """Create a fresh SQLite in-memory database engine for the test session."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    db_url = os.environ.get("SOKO_TEST_DATABASE_URL", "sqlite+aiosqlite://")
+    engine = create_async_engine(db_url, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
