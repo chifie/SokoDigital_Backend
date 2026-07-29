@@ -5,7 +5,12 @@ Verifies that the global exception handlers registered by
 the backward-compatible ``detail`` key.
 """
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import (
     HTTP_400_BAD_REQUEST,
@@ -17,9 +22,9 @@ from starlette.status import (
 
 from app.utils.response import (
     _build_error_body,
+    _general_exception_handler,
     _http_exception_handler,
     _validation_exception_handler,
-    _general_exception_handler,
     register_error_handlers,
 )
 
@@ -89,9 +94,6 @@ class TestHTTPExceptionHandler:
     @pytest.mark.asyncio
     async def test_returns_json_with_detail(self) -> None:
         """The handler must include the ``detail`` key in the JSON body."""
-        from fastapi import Request
-        from unittest.mock import AsyncMock, MagicMock
-
         exc = StarletteHTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
         request = MagicMock(spec=Request)
 
@@ -105,9 +107,6 @@ class TestHTTPExceptionHandler:
 
     @pytest.mark.asyncio
     async def test_400_response_shape(self) -> None:
-        from fastapi import Request
-        from unittest.mock import MagicMock
-
         exc = StarletteHTTPException(HTTP_400_BAD_REQUEST, "Bad input")
         request = MagicMock(spec=Request)
 
@@ -127,11 +126,6 @@ class TestValidationExceptionHandler:
 
     @pytest.mark.asyncio
     async def test_422_response_shape(self) -> None:
-        from fastapi import Request
-        from fastapi.exceptions import RequestValidationError
-        from pydantic import ValidationError
-        from unittest.mock import MagicMock
-        from pydantic import BaseModel
 
         class DummyModel(BaseModel):
             name: str
@@ -161,8 +155,6 @@ class TestGeneralExceptionHandler:
 
     @pytest.mark.asyncio
     async def test_500_response_shape(self) -> None:
-        from fastapi import Request
-        from unittest.mock import MagicMock
         from app.config import settings
 
         # Temporarily force DEBUG off
@@ -185,6 +177,25 @@ class TestGeneralExceptionHandler:
         finally:
             settings.DEBUG = original_debug
 
+    @pytest.mark.asyncio
+    async def test_leaks_details_in_debug_mode(self) -> None:
+        from app.config import settings
+
+        original_debug = settings.DEBUG
+        settings.DEBUG = True
+
+        try:
+            exc = RuntimeError("Debug info here")
+            request = MagicMock(spec=Request)
+
+            response = await _general_exception_handler(request, exc)
+            body = response.body.decode()
+
+            assert response.status_code == HTTP_500_INTERNAL_SERVER_ERROR
+            assert "Debug info here" in body
+        finally:
+            settings.DEBUG = original_debug
+
 
 # ── Tests for register_error_handlers ────────────────────────────────────────
 
@@ -193,8 +204,6 @@ class TestRegisterErrorHandlers:
     """Tests that the registration function wires handlers correctly."""
 
     def test_registers_three_handlers(self) -> None:
-        from unittest.mock import MagicMock
-
         app = MagicMock(spec=FastAPI)
         register_error_handlers(app)  # type: ignore[arg-type]
 
@@ -202,7 +211,6 @@ class TestRegisterErrorHandlers:
         assert app.add_exception_handler.call_count == 3
 
     def test_http_handler_registered_first(self) -> None:
-        from unittest.mock import MagicMock
         from starlette.exceptions import HTTPException as SE
 
         app = MagicMock(spec=FastAPI)
@@ -239,7 +247,3 @@ class TestIntegration:
             assert "version" in data
         except Exception:
             pytest.skip("Database not available for integration test")
-
-
-# Need FastAPI import at module level
-from fastapi import FastAPI  # noqa: E402

@@ -9,16 +9,16 @@ These are collected via middleware and served at ``/metrics``.
 
 Usage in ``main.py``::
 
-    from app.middleware.metrics import MetricsMiddleware, metrics_app
+    from app.middleware.metrics import MetricsMiddleware, metrics_endpoint
 
     app.add_middleware(MetricsMiddleware)
-    app.mount(\"/metrics\", metrics_app)
+    app.add_api_route(\"/metrics\", metrics_endpoint, include_in_schema=False)
 """
 
 import time
 from collections.abc import Callable
 
-from fastapi import FastAPI, Request
+from fastapi import Request
 from fastapi.responses import PlainTextResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -32,23 +32,9 @@ try:
 except ImportError:
     PROMETHEUS_AVAILABLE = False
 
-    # Stub for when prometheus_client is not installed
-    class _FakeCounter:
-        def labels(self, **kwargs: str) -> "_FakeCounter":
-            return self
-
-        def inc(self, *args: object, **kwargs: object) -> None:
-            pass
-
-    class _FakeHistogram:
-        def labels(self, **kwargs: str) -> "_FakeHistogram":
-            return self
-
-        def observe(self, *args: object, **kwargs: object) -> None:
-            pass
-
-    class _FakeGauge:
-        def labels(self, **kwargs: str) -> "_FakeGauge":
+    # Stub classes for when prometheus_client is not installed
+    class _StubMetric:  # pylint: disable=too-few-public-methods
+        def labels(self, **kwargs: str) -> "_StubMetric":
             return self
 
         def inc(self, *args: object, **kwargs: object) -> None:
@@ -57,9 +43,12 @@ except ImportError:
         def dec(self, *args: object, **kwargs: object) -> None:
             pass
 
-    Counter = _FakeCounter  # type: ignore[misc,assignment]
-    Histogram = _FakeHistogram  # type: ignore[misc,assignment]
-    Gauge = _FakeGauge  # type: ignore[misc,assignment]
+        def observe(self, *args: object, **kwargs: object) -> None:
+            pass
+
+    Counter = _StubMetric  # type: ignore[misc,assignment]
+    Histogram = _StubMetric  # type: ignore[misc,assignment]
+    Gauge = _StubMetric  # type: ignore[misc,assignment]
     REGISTRY = None  # type: ignore[misc]
 
 
@@ -112,22 +101,25 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         # Derive a route template from the request's matched route
         path = self._get_route_path(request)
+        response: Response | None = None
 
         REQUESTS_IN_PROGRESS.labels(method=method).inc()
 
         start = time.monotonic()
         try:
-            response: Response = await call_next(request)
+            response = await call_next(request)
             return response
         except Exception:
             EXCEPTIONS_TOTAL.labels(status="500").inc()
             raise
         finally:
             duration = time.monotonic() - start
-            status_code = response.status_code  # type: ignore[possibly-undefined]
+            if response is not None:
+                REQUESTS_TOTAL.labels(
+                    method=method, path=path, status=str(response.status_code)
+                ).inc()
+                REQUESTS_DURATION.labels(method=method, path=path).observe(duration)
             REQUESTS_IN_PROGRESS.labels(method=method).dec()
-            REQUESTS_TOTAL.labels(method=method, path=path, status=str(status_code)).inc()
-            REQUESTS_DURATION.labels(method=method, path=path).observe(duration)
 
     @staticmethod
     def _get_route_path(request: Request) -> str:
