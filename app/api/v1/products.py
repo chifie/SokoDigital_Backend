@@ -1,11 +1,12 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_current_user, require_admin
+from app.config import settings
 from app.database import get_db
 from app.models.product import Product, ProductImage
 from app.models.seller import Seller
@@ -86,6 +87,7 @@ async def list_products(
 
     Supports:
     - **Full-text search** across product names and descriptions
+      (uses Meilisearch when configured, falls back to PostgreSQL ``tsvector``)
     - **Category, seller, price range, and condition** filters
     - **Sorting** by created_at, price, rating, or sales
     - **Featured/trending** product filters
@@ -93,7 +95,55 @@ async def list_products(
 
     Returns a paginated response with ``items``, ``total``, ``skip``, ``limit``, and ``pages``.
     """
-    # Build the base query with filters (for both count and results)
+    # Try Meilisearch first when a search query is provided
+    if q and settings.MEILISEARCH_URL:
+        from app.services.search import search_products
+
+        ms_filters: dict = {}
+        if category_id:
+            ms_filters["category_id"] = str(category_id)
+        if seller_id:
+            ms_filters["seller_id"] = str(seller_id)
+        if min_price is not None:
+            ms_filters["price"] = {"gte": min_price}
+        if max_price is not None:
+            ms_filters.setdefault("price", {})
+            ms_filters["price"]["lte"] = max_price
+        if condition:
+            ms_filters["condition"] = condition
+        if featured is not None:
+            ms_filters["featured"] = featured
+        if trending is not None:
+            ms_filters["trending"] = trending
+        ms_filters["status"] = status
+
+        ms_sort = [f"{sort_by or 'created_at'}:{sort_order}"]
+
+        ms_results = await search_products(
+            query=q,
+            filters=ms_filters if any(v is not None and v != {} for v in ms_filters.values()) else None,
+            sort=ms_sort,
+            limit=limit,
+            offset=skip,
+        )
+
+        if ms_results is not None and ms_results["hits"]:
+            product_ids = [h["id"] for h in ms_results["hits"]]
+            if product_ids:
+                ordering = case(
+                    *[{Product.id: pid} for pid in product_ids],
+                    else_=None,
+                )
+                result = await db.execute(
+                    select(Product)
+                    .options(selectinload(Product.images))
+                    .where(Product.id.in_(product_ids))
+                    .order_by(ordering)
+                )
+                items = result.scalars().unique().all()
+                return Page(items=items, total=ms_results["total"], skip=skip, limit=limit)
+
+    # Fallback: build the SQL query with filters
     filters = [Product.status == status]
     if q:
         search_vector = func.to_tsvector(
@@ -116,18 +166,15 @@ async def list_products(
     if trending is not None:
         filters.append(Product.trending == trending)
 
-    # Total count
     count_stmt = select(func.count(Product.id)).where(*filters)
     total = (await db.execute(count_stmt)).scalar() or 0
 
-    # Data query
     stmt = (
         select(Product)
         .options(selectinload(Product.images))
         .where(*filters)
     )
 
-    # Full-text search sort
     if q:
         search_vector = func.to_tsvector(
             "english", Product.name + " " + func.coalesce(Product.description, "")
