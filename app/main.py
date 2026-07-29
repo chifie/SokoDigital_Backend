@@ -32,6 +32,9 @@ async def lifespan(application: FastAPI):
     # Close the rate limiter connection (e.g., Redis) if applicable
     from app.middleware.rate_limit import _limiter
     await _limiter.close()
+    # Close the cache connection
+    from app.middleware.cache import close_cache
+    await close_cache()
     logger.info("Shutdown complete")
 
 
@@ -57,6 +60,13 @@ register_error_handlers(app)
 from app.middleware.request_id import RequestIDMiddleware
 
 app.add_middleware(RequestIDMiddleware)  # type: ignore[arg-type]
+
+# ---------------------------------------------------------------------------
+# Metrics middleware — Prometheus request tracking (before CORS so it sees all)
+# ---------------------------------------------------------------------------
+from app.middleware.metrics import MetricsMiddleware, metrics_endpoint
+
+app.add_middleware(MetricsMiddleware)  # type: ignore[arg-type]
 
 # ---------------------------------------------------------------------------
 # CORS — allow the frontend origins
@@ -101,8 +111,15 @@ async def api_info():
         "docs": "/docs",
         "redoc": "/redoc",
         "openapi": f"{settings.API_V1_PREFIX}/openapi.json",
+        "metrics": "/metrics",
         "api_prefix": settings.API_V1_PREFIX,
     }
+
+
+# ---------------------------------------------------------------------------
+# Metrics endpoint (serves Prometheus-format data at /metrics)
+# ---------------------------------------------------------------------------
+app.add_api_route("/metrics", metrics_endpoint, include_in_schema=False)
 
 
 # ---------------------------------------------------------------------------

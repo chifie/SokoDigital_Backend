@@ -12,6 +12,9 @@ redis==5.2.1
 pydantic==2.10.3
 pydantic-settings==2.7.0
 
+# Metrics & Monitoring
+prometheus-client==0.21.1
+
 # Auth & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
