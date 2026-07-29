@@ -67,11 +67,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run unit tests with SQLite
+      - name: Run unit tests
         run: |
           python -m pytest tests/ -v --tb=short -k "not test_email_verification"
-        env:
-          SOKO_TESTING: "1"
 
       - name: Run integration tests with PostgreSQL
         run: |
