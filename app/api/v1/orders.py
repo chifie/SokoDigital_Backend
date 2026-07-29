@@ -98,22 +98,44 @@ async def checkout(
 
 
 # ── GET /orders ────────────────────────────────────────────────────────────
-@router.get("", response_model=list[OrderResponse], summary="List the current user's orders")
+@router.get(
+    "",
+    response_model=Page[OrderResponse],
+    summary="List the current user's orders with pagination",
+    response_description="Paginated list of the user's orders",
+)
 async def list_orders(
-    status_filter: str | None = None,
+    status_filter: str | None = Query(None, description="Filter by order status (pending, confirmed, processing, shipped, delivered, cancelled)"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum records per page"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """
+    Retrieve orders placed by the authenticated user.
+
+    Supports filtering by status and cursor-less pagination via ``skip``/``limit``.
+    Orders are returned newest-first.
+    """
+    filters = [Order.user_id == current_user.id]
+    if status_filter:
+        filters.append(Order.status == status_filter)
+
+    count_stmt = select(func.count(Order.id)).where(*filters)
+    total = (await db.execute(count_stmt)).scalar() or 0
+
     stmt = (
         select(Order)
         .options(selectinload(Order.items))
-        .where(Order.user_id == current_user.id)
+        .where(*filters)
         .order_by(Order.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
-    if status_filter:
-        stmt = stmt.where(Order.status == status_filter)
     result = await db.execute(stmt)
-    return result.scalars().unique().all()
+    items = result.scalars().unique().all()
+
+    return Page(items=items, total=total, skip=skip, limit=limit)
 
 
 # ── GET /orders/{order_id} ─────────────────────────────────────────────────
