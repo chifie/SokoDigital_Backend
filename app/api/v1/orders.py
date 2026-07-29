@@ -35,7 +35,17 @@ async def _get_order_or_404(db: AsyncSession, order_id: uuid.UUID, user_id: uuid
 
 
 # ── POST /orders/checkout ──────────────────────────────────────────────────
-@router.post("/checkout", response_model=OrderResponse, status_code=status.HTTP_201_CREATED, summary="Checkout and create an order")
+@router.post(
+    "/checkout",
+    response_model=OrderResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Checkout and create an order",
+    responses={
+        201: {"description": "Order created successfully"},
+        400: {"description": "Insufficient stock or invalid request"},
+        404: {"description": "Shipping address or product not found"},
+    },
+)
 async def checkout(
     body: CheckoutRequest,
     db: AsyncSession = Depends(get_db),
@@ -139,7 +149,12 @@ async def list_orders(
 
 
 # ── GET /orders/{order_id} ─────────────────────────────────────────────────
-@router.get("/{order_id}", response_model=OrderResponse, summary="Get order details with timeline")
+@router.get(
+    "/{order_id}",
+    response_model=OrderResponse,
+    summary="Get order details with status timeline",
+    responses={404: {"description": "Order not found"}},
+)
 async def get_order(
     order_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -149,7 +164,16 @@ async def get_order(
 
 
 # ── PUT /orders/{order_id}/status (seller/admin only) ──────────────────────
-@router.put("/{order_id}/status", response_model=OrderResponse, summary="Update order status (seller/admin)")
+@router.put(
+    "/{order_id}/status",
+    response_model=OrderResponse,
+    summary="Update order status (seller/admin only)",
+    responses={
+        200: {"description": "Order status updated"},
+        403: {"description": "Not authorized to update this order"},
+        404: {"description": "Order not found"},
+    },
+)
 async def update_order_status(
     order_id: uuid.UUID,
     body: OrderStatusUpdate,
