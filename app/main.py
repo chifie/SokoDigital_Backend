@@ -19,6 +19,9 @@ async def lifespan(application: FastAPI):
     yield
     # Dispose of the connection pool on shutdown
     await engine.dispose()
+    # Close the rate limiter connection (e.g., Redis) if applicable
+    from app.middleware.rate_limit import _limiter
+    await _limiter.close()
 
 
 app = FastAPI(
