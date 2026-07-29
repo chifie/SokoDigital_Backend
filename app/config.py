@@ -19,9 +19,6 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "development"  # development | staging | production
 
-    # Health check
-    HEALTH_CHECK_ENABLED: bool = True
-
     # API
     API_V1_PREFIX: str = "/api/v1"
 
