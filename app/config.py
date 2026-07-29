@@ -21,6 +21,8 @@ class Settings(BaseSettings):
 
     # API
     API_V1_PREFIX: str = "/api/v1"
+    API_LATEST_VERSION: str = "v1"
+    API_SUPPORTED_VERSIONS: list[str] = ["v1"]
 
     # Frontend URL (for email links)
     APP_URL: str = "http://localhost:5173"
