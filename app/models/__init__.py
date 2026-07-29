@@ -7,6 +7,7 @@ from app.models.seller import Seller
 from app.models.seller_follow import SellerFollow
 from app.models.shopping import Address, Order, OrderItem, Review, WishlistItem
 from app.models.user import User
+from app.models.webhook import Webhook, WebhookEvent
 
 __all__ = [
     "Address",
@@ -26,5 +27,7 @@ __all__ = [
     "Seller",
     "SellerFollow",
     "User",
+    "Webhook",
+    "WebhookEvent",
     "WishlistItem",
 ]

@@ -72,6 +72,14 @@ class Settings(BaseSettings):
     AI_MODEL: str = "gpt-4o-mini"
     AI_MAX_TOKENS: int = 1024
 
+    # Meilisearch (optional, for full-text product search)
+    MEILISEARCH_URL: Optional[str] = None
+    MEILISEARCH_API_KEY: Optional[str] = None
+
+    # Webhooks
+    WEBHOOK_MAX_ATTEMPTS: int = 3
+    WEBHOOK_TIMEOUT_SECONDS: int = 10
+
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",

@@ -40,5 +40,8 @@ pytest-asyncio==1.4.0
 pytest-cov==6.0.0
 httpx==0.28.1
 
+# Full-text Search (optional — for production)
+meilisearch==0.37.0
+
 # Error Monitoring (optional — for production)
 sentry-sdk==2.22.0
