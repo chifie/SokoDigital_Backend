@@ -14,6 +14,7 @@ Supports **two logging modes**:
 
 import json
 import logging
+import os
 import uuid
 from collections.abc import Callable
 from contextvars import ContextVar
@@ -130,7 +131,7 @@ def setup_logging() -> None:
     uses plain-text output with request_id support.
     """
     use_json = settings.ENVIRONMENT == "production" or bool(
-        __import__("os").environ.get("STRUCTLOG_ENABLED", "")
+        os.environ.get("STRUCTLOG_ENABLED", "")
     )
 
     root = logging.getLogger()
