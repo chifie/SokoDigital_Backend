@@ -4,7 +4,7 @@ These tests validate the core business logic of the seller follow
 system: following/unfollowing, follower counts, and duplicate prevention.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -42,10 +42,8 @@ class TestSellerFollowLogic:
 
     def test_seller_follow_model_has_required_fields(self) -> None:
         """SellerFollow model should have seller_id and user_id."""
-        import inspect
-
         # Check SellerFollow has the expected columns
-        members = dict(inspect.getmembers(SellerFollow))
+        members = dict(SellerFollow.__dict__)
         assert hasattr(SellerFollow, "seller_id")
         assert hasattr(SellerFollow, "user_id")
         assert hasattr(SellerFollow, "created_at")
