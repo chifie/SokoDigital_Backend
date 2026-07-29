@@ -126,7 +126,7 @@ class TestInvalidateCacheTask:
 
         with (
             patch("app.tasks.settings.REDIS_URL", "redis://localhost:6379/0"),
-            patch("app.tasks.aioredis.from_url", return_value=mock_redis),
+            patch("redis.asyncio.from_url", return_value=mock_redis),
         ):
             result = await invalidate_cache_task({}, key_prefix="cache:")
 
@@ -142,7 +142,7 @@ class TestInvalidateCacheTask:
 
         with (
             patch("app.tasks.settings.REDIS_URL", "redis://localhost:6379/0"),
-            patch("app.tasks.aioredis.from_url", return_value=mock_redis),
+            patch("redis.asyncio.from_url", return_value=mock_redis),
         ):
             result = await invalidate_cache_task({}, pattern="prod:*")
 
@@ -156,7 +156,7 @@ class TestInvalidateCacheTask:
 
         with (
             patch("app.tasks.settings.REDIS_URL", "redis://localhost:6379/0"),
-            patch("app.tasks.aioredis.from_url", return_value=mock_redis),
+            patch("redis.asyncio.from_url", return_value=mock_redis),
         ):
             result = await invalidate_cache_task({}, key_prefix="nonexistent:")
 
@@ -170,7 +170,7 @@ class TestInvalidateCacheTask:
 
         with (
             patch("app.tasks.settings.REDIS_URL", "redis://localhost:6379/0"),
-            patch("app.tasks.aioredis.from_url", return_value=mock_redis),
+            patch("redis.asyncio.from_url", return_value=mock_redis),
         ):
             result = await invalidate_cache_task({}, key_prefix="cache:")
 
@@ -206,8 +206,17 @@ class TestEnqueueEmail:
         mock_job.job_id = "job_123"
         mock_pool.enqueue_job.return_value = mock_job
 
-        with patch("app.tasks._get_arq_pool", return_value=mock_pool):
-            result = await enqueue_email(
+        # Mock arq import so the function can find it
+        with (
+            patch.dict("sys.modules", {"arq": MagicMock()}),
+            patch("app.tasks._get_arq_pool", return_value=mock_pool),
+        ):
+            # Re-import the module so it uses the mocked arq
+            import importlib
+            import app.tasks
+            importlib.reload(app.tasks)
+
+            result = await app.tasks.enqueue_email(
                 to_email="test@example.com",
                 template_name="welcome",
             )
@@ -261,10 +270,15 @@ class TestEnqueueCacheInvalidation:
         mock_pool.enqueue_job.return_value = mock_job
 
         with (
+            patch.dict("sys.modules", {"arq": MagicMock()}),
             patch("app.tasks._get_arq_pool", return_value=mock_pool),
             patch("app.tasks.invalidate_cache_task", new_callable=AsyncMock) as mock_inline,
         ):
-            result = await enqueue_cache_invalidation(pattern="prod:*")
+            import importlib
+            import app.tasks
+            importlib.reload(app.tasks)
+
+            result = await app.tasks.enqueue_cache_invalidation(pattern="prod:*")
 
         assert result == 0  # Unknown until task runs
         mock_pool.enqueue_job.assert_awaited_once_with(
