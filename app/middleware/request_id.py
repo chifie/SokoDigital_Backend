@@ -79,21 +79,6 @@ class JSONLogFormatter(logging.Formatter):
                 "message": str(record.exc_info[1]),
             }
 
-        # Include any extra attributes set on the record
-        for key, value in record.__dict__.items():
-            if key not in (
-                "args", "asctime", "created", "exc_info", "exc_text",
-                "filename", "funcName", "levelname", "levelno", "lineno",
-                "message", "module", "msecs", "msg", "name", "pathname",
-                "process", "processName", "relativeCreated", "stack_info",
-                "thread", "threadName", "request_id",
-            ):
-                try:
-                    json.dumps(value)
-                    log_entry[key] = value
-                except (TypeError, ValueError):
-                    log_entry[key] = str(value)
-
         return json.dumps(log_entry, default=str)
 
 
@@ -144,8 +129,8 @@ def setup_logging() -> None:
     env var is set, uses JSON output via ``JSONLogFormatter``. Otherwise
     uses plain-text output with request_id support.
     """
-    use_json = settings.ENVIRONMENT == "production" or getattr(
-        settings, "STRUCTLOG_ENABLED", False
+    use_json = settings.ENVIRONMENT == "production" or bool(
+        __import__("os").environ.get("STRUCTLOG_ENABLED", "")
     )
 
     root = logging.getLogger()
