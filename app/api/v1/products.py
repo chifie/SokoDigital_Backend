@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.product import Product, ProductImage
 from app.models.seller import Seller
 from app.models.user import User
+from app.schemas.common import Page
 from app.schemas.product import (
     ProductCreate,
     ProductImageSchema,
@@ -55,76 +56,98 @@ async def _get_seller_for_user(
     return seller
 
 
-# ── GET /products (list with search/filter/sort) ────────────────────────────
+# ── GET /products (list with search/filter/sort + pagination) ───────────────
 @router.get(
     "",
-    response_model=list[ProductResponse],
-    summary="List products with search, filter, and sort",
+    response_model=Page[ProductResponse],
+    summary="List products with search, filter, sort, and pagination",
+    response_description="Paginated list of products with total count",
 )
 async def list_products(
     q: str | None = Query(None, description="Full-text search query"),
-    category_id: uuid.UUID | None = None,
-    seller_id: uuid.UUID | None = None,
-    min_price: float | None = None,
-    max_price: float | None = None,
-    condition: str | None = None,
-    status: str = Query("active", description="Filter by status"),
-    featured: bool | None = None,
-    trending: bool | None = None,
+    category_id: uuid.UUID | None = Query(None, description="Filter by category ID"),
+    seller_id: uuid.UUID | None = Query(None, description="Filter by seller ID"),
+    min_price: float | None = Query(None, description="Minimum price filter", ge=0),
+    max_price: float | None = Query(None, description="Maximum price filter", ge=0),
+    condition: str | None = Query(None, description="Filter by condition (new, used, refurbished)"),
+    status: str = Query("active", description="Filter by product status"),
+    featured: bool | None = Query(None, description="Filter featured products only"),
+    trending: bool | None = Query(None, description="Filter trending products only"),
     sort_by: str | None = Query(
-        None, description="created_at, price, rating, sold"
+        None, description="Sort field: created_at, price, rating, sold"
     ),
-    sort_order: str = Query("desc", description="asc or desc"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    sort_order: str = Query("desc", description="Sort direction: asc or desc"),
+    skip: int = Query(0, ge=0, description="Number of records to skip (pagination)"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum records per page"),
     db: AsyncSession = Depends(get_db),
 ):
-    """List products with full-text search, filtering, and sorting."""
-    stmt = select(Product).options(selectinload(Product.images))
+    """
+    Browse products with powerful search and filtering capabilities.
 
-    # Full-text search
+    Supports:
+    - **Full-text search** across product names and descriptions
+    - **Category, seller, price range, and condition** filters
+    - **Sorting** by created_at, price, rating, or sales
+    - **Featured/trending** product filters
+    - **Cursor-less pagination** via skip/limit
+
+    Returns a paginated response with ``items``, ``total``, ``skip``, ``limit``, and ``pages``.
+    """
+    # Build the base query with filters (for both count and results)
+    filters = [Product.status == status]
     if q:
         search_vector = func.to_tsvector(
             "english", Product.name + " " + func.coalesce(Product.description, "")
         )
         search_query = func.to_tsquery("english", " & ".join(q.split()))
-        stmt = stmt.where(search_vector.op("@@")(search_query))
-        stmt = stmt.order_by(func.ts_rank(search_vector, search_query).desc())
-
-    # Filters
-    stmt = stmt.where(Product.status == status)
+        filters.append(search_vector.op("@@")(search_query))
     if category_id:
-        stmt = stmt.where(Product.category_id == category_id)
+        filters.append(Product.category_id == category_id)
     if seller_id:
-        stmt = stmt.where(Product.seller_id == seller_id)
+        filters.append(Product.seller_id == seller_id)
     if min_price is not None:
-        stmt = stmt.where(Product.price >= min_price)
+        filters.append(Product.price >= min_price)
     if max_price is not None:
-        stmt = stmt.where(Product.price <= max_price)
+        filters.append(Product.price <= max_price)
     if condition:
-        stmt = stmt.where(Product.condition == condition)
+        filters.append(Product.condition == condition)
     if featured is not None:
-        stmt = stmt.where(Product.featured == featured)
+        filters.append(Product.featured == featured)
     if trending is not None:
-        stmt = stmt.where(Product.trending == trending)
+        filters.append(Product.trending == trending)
 
-    # Sorting (apply default sort if not a search query)
-    if not q:
+    # Total count
+    count_stmt = select(func.count(Product.id)).where(*filters)
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    # Data query
+    stmt = (
+        select(Product)
+        .options(selectinload(Product.images))
+        .where(*filters)
+    )
+
+    # Full-text search sort
+    if q:
+        search_vector = func.to_tsvector(
+            "english", Product.name + " " + func.coalesce(Product.description, "")
+        )
+        search_query = func.to_tsquery("english", " & ".join(q.split()))
+        stmt = stmt.order_by(func.ts_rank(search_vector, search_query).desc())
+    else:
         sort_column = {
             "created_at": Product.created_at,
             "price": Product.price,
             "rating": Product.rating,
             "sold": Product.sold,
         }.get(sort_by, Product.created_at)
-
-        if sort_order == "asc":
-            stmt = stmt.order_by(sort_column.asc())
-        else:
-            stmt = stmt.order_by(sort_column.desc())
+        stmt = stmt.order_by(sort_column.asc() if sort_order == "asc" else sort_column.desc())
 
     stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
-    return result.scalars().unique().all()
+    items = result.scalars().unique().all()
+
+    return Page(items=items, total=total, skip=skip, limit=limit)
 
 
 # ── GET /products/featured ──────────────────────────────────────────────────
@@ -132,12 +155,17 @@ async def list_products(
     "/featured",
     response_model=list[ProductResponse],
     summary="List featured products",
+    response_description="Collection of featured products sorted by rating",
 )
 async def list_featured_products(
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of products to return"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return featured products, ordered by rating descending."""
+    """
+    Retrieve products marked as **featured**, ordered by rating descending.
+
+    Useful for hero sections or promotional carousels on the homepage.
+    """
     result = await db.execute(
         select(Product)
         .options(selectinload(Product.images))
@@ -153,12 +181,17 @@ async def list_featured_products(
     "/trending",
     response_model=list[ProductResponse],
     summary="List trending products",
+    response_description="Collection of trending products sorted by sales",
 )
 async def list_trending_products(
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of products to return"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return trending products, ordered by sold count descending."""
+    """
+    Retrieve products marked as **trending**, ordered by units sold descending.
+
+    Highlights best-selling products to drive conversions.
+    """
     result = await db.execute(
         select(Product)
         .options(selectinload(Product.images))
@@ -174,12 +207,17 @@ async def list_trending_products(
     "/{slug}",
     response_model=ProductResponse,
     summary="Get a product by its URL slug",
+    responses={404: {"description": "Product not found"}},
 )
 async def get_product_by_slug(
     slug: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Fetch a single product by its URL slug."""
+    """
+    Fetch detailed information about a single product using its unique URL slug.
+
+    Includes all product images, specifications, pricing, and seller info.
+    """
     result = await db.execute(
         select(Product)
         .options(selectinload(Product.images))
@@ -200,13 +238,26 @@ async def get_product_by_slug(
     response_model=ProductResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new product (seller only)",
+    responses={
+        201: {"description": "Product created successfully"},
+        403: {"description": "Not a registered seller"},
+        409: {"description": "Product slug already exists"},
+    },
 )
 async def create_product(
     body: ProductCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new product under the authenticated seller's store."""
+    """
+    Create a new product listing under the authenticated user's seller store.
+
+    The authenticated user **must** be a registered seller first (see ``/sellers/onboard``).
+    Product slugs must be unique across the entire marketplace.
+
+    Images can be provided inline via the ``images`` array or uploaded separately
+    via the ``/uploads`` endpoints.
+    """
     seller = await _get_seller_for_user(db, current_user.id)
 
     # Check slug uniqueness
@@ -255,6 +306,11 @@ async def create_product(
     "/{product_id}",
     response_model=ProductResponse,
     summary="Update a product (seller only)",
+    responses={
+        200: {"description": "Product updated successfully"},
+        403: {"description": "Not authorized to update this product"},
+        404: {"description": "Product not found"},
+    },
 )
 async def update_product(
     product_id: uuid.UUID,
@@ -262,7 +318,12 @@ async def update_product(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update an existing product. Only the owning seller or admin can update."""
+    """
+    Update an existing product listing.
+
+    Only the **owning seller** or an **admin** can update a product.
+    Partial updates are supported — only provided fields will be changed.
+    """
     product = await _get_product_or_404(db, product_id)
     seller = await _get_seller_for_user(db, current_user.id)
 
@@ -297,13 +358,23 @@ async def update_product(
     "/{product_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a product (seller only)",
+    responses={
+        204: {"description": "Product deleted successfully (no content)"},
+        403: {"description": "Not authorized to delete this product"},
+        404: {"description": "Product not found"},
+    },
 )
 async def delete_product(
     product_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a product. Only the owning seller or admin can delete."""
+    """
+    Permanently delete a product listing and its associated images.
+
+    Only the **owning seller** or an **admin** can delete a product.
+    This action is irreversible.
+    """
     product = await _get_product_or_404(db, product_id)
     seller = await _get_seller_for_user(db, current_user.id)
 
