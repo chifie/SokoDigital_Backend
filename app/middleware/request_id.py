@@ -6,17 +6,25 @@ correlation across services.
 
 Uses ``contextvars`` instead of modifying the global ``LogRecordFactory``
 to ensure correctness in concurrent async requests.
+
+Supports **two logging modes**:
+- Plain-text (default via ``logging``)
+- Structured JSON (via ``structlog`` when ``STRUCTLOG_ENABLED=true``)
 """
 
+import json
 import logging
 import uuid
 from collections.abc import Callable
 from contextvars import ContextVar
+from datetime import datetime, timezone
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from starlette.types import ASGIApp
+
+from app.config import settings
 
 # Context variable that holds the current request ID.
 # This is safe for concurrent async requests — each request gets its own
@@ -29,12 +37,67 @@ def get_request_id() -> str:
     return _request_id_var.get()
 
 
+# ── Plain-text logging filter (backward compatible) ──────────────────────────
+
+
 class RequestIDFilter(logging.Filter):
     """Logging filter that injects ``request_id`` into every log record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = get_request_id()
         return True
+
+
+# ── Structured JSON logging via structlog ────────────────────────────────────
+
+
+class JSONLogFormatter(logging.Formatter):
+    """Custom formatter that outputs log records as newline-delimited JSON.
+
+    Produces output compatible with log shipping tools (Elasticsearch,
+    Datadog, Splunk, etc.). Includes request_id from the async context.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry: dict[str, object] = {
+            "timestamp": datetime.fromtimestamp(
+                record.created, tz=timezone.utc
+            ).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "request_id": get_request_id(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+
+        # Include exception info if present
+        if record.exc_info and record.exc_info[0] is not None:
+            log_entry["exception"] = {
+                "type": record.exc_info[0].__name__,
+                "message": str(record.exc_info[1]),
+            }
+
+        # Include any extra attributes set on the record
+        for key, value in record.__dict__.items():
+            if key not in (
+                "args", "asctime", "created", "exc_info", "exc_text",
+                "filename", "funcName", "levelname", "levelno", "lineno",
+                "message", "module", "msecs", "msg", "name", "pathname",
+                "process", "processName", "relativeCreated", "stack_info",
+                "thread", "threadName", "request_id",
+            ):
+                try:
+                    json.dumps(value)
+                    log_entry[key] = value
+                except (TypeError, ValueError):
+                    log_entry[key] = str(value)
+
+        return json.dumps(log_entry, default=str)
+
+
+# ── Middleware ───────────────────────────────────────────────────────────────
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
@@ -71,23 +134,36 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             _request_id_var.reset(token)
 
 
-def setup_logging() -> None:
-    """Configure structured logging with request ID support.
+# ── Logging setup ────────────────────────────────────────────────────────────
 
-    Adds a ``RequestIDFilter`` to the root logger so that every log record
-    automatically carries the current request ID.
+
+def setup_logging() -> None:
+    """Configure structured logging.
+
+    If ``settings.ENVIRONMENT`` is ``production`` or ``STRUCTLOG_ENABLED``
+    env var is set, uses JSON output via ``JSONLogFormatter``. Otherwise
+    uses plain-text output with request_id support.
     """
-    handler = logging.StreamHandler()
-    handler.setFormatter(
-        logging.Formatter(
-            fmt="%(asctime)s | %(levelname)-8s | %(request_id)-16s | %(name)s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+    use_json = settings.ENVIRONMENT == "production" or getattr(
+        settings, "STRUCTLOG_ENABLED", False
     )
-    handler.addFilter(RequestIDFilter())
 
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     # Remove any pre-existing handlers to avoid duplicate output
     root.handlers.clear()
+
+    handler = logging.StreamHandler()
+
+    if use_json:
+        handler.setFormatter(JSONLogFormatter())
+    else:
+        handler.setFormatter(
+            logging.Formatter(
+                fmt="%(asctime)s | %(levelname)-8s | %(request_id)-16s | %(name)s | %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        )
+        handler.addFilter(RequestIDFilter())
+
     root.addHandler(handler)
