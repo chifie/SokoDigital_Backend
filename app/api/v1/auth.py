@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user, get_optional_user
+from app.middleware.rate_limit import AUTH_RATE_LIMIT, rate_limit
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
