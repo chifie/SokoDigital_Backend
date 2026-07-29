@@ -82,37 +82,48 @@ async def _get_category_or_404(
 @router.get(
     "",
     response_model=list[CategoryResponse],
-    summary="List all active categories (flat)",
+    summary="List all categories (flat list)",
+    response_description="Flat list of categories sorted by sort_order and name",
 )
 async def list_categories(
     db: AsyncSession = Depends(get_db),
-    include_inactive: bool = False,
+    include_inactive: bool = Query(False, description="Include inactive categories"),
 ):
-    """Return all categories. Parent categories and subcategories
-    are returned in a flat list. Use ``/categories/tree`` for a nested view.
+    """
+    Return all categories as a flat list.
 
-    Pass ``?include_inactive=true`` to include inactive categories.
+    Parent categories and subcategories are returned in a single-level array.
+    Use ``/categories/tree`` for a hierarchical navigation view.
+    Pass ``?include_inactive=true`` to include disabled categories.
     """
     stmt = select(Category).order_by(Category.sort_order, Category.name)
     if not include_inactive:
         stmt = stmt.where(Category.is_active == True)
 
     result = await db.execute(stmt)
-    return result.scalars().all()
+    categories = result.scalars().all()
+
+    # Only return top-level categories (no parent) — their children are loaded
+    return [c for c in categories if c.parent_id is None]
 
 
 # ── GET /categories/tree (nested tree) ──────────────────────────────────────
 @router.get(
     "/tree",
     response_model=list[CategoryTreeNode],
-    summary="List all categories as a nested tree",
+    summary="List categories as a nested tree",
+    response_description="Hierarchical category tree ideal for navigation menus",
 )
 async def list_category_tree(
     db: AsyncSession = Depends(get_db),
-    include_inactive: bool = False,
+    include_inactive: bool = Query(False, description="Include inactive categories"),
 ):
-    """Return all top-level categories with their children nested inside
-    the ``children`` array. Ideal for navigation menus.
+    """
+    Return all top-level categories with their subcategories nested inside
+    the ``children`` array.
+
+    This is the ideal endpoint for building navigation menus and category
+    dropdowns on the frontend.
     """
     stmt = (
         select(Category)
