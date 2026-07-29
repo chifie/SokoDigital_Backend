@@ -26,3 +26,8 @@ email-validator==2.2.0
 
 # Development
 # (uvicorn --reload is built-in)
+
+# Testing
+pytest==9.1.1
+pytest-asyncio==1.4.0
+httpx==0.28.1
