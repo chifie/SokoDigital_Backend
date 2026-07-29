@@ -59,6 +59,10 @@ async def validate_coupon(
 
     discount = coupon.value if coupon.type == "fixed" else (body.cart_total * coupon.value / 100)
 
+    # Increment usage count
+    coupon.current_uses += 1
+    await db.commit()
+
     return CouponValidateResponse(
         valid=True,
         message="Coupon applied successfully",
