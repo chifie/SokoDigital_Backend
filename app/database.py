@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -8,11 +9,20 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import settings
 
+# Allow overriding the database URL via environment (used by tests)
+def _get_database_url() -> str:
+    """Return the database URL, respecting the TEST_DATABASE_URL override."""
+    return os.environ.get(
+        "SOKO_TEST_DATABASE_URL",
+        settings.TEST_DATABASE_URL if os.environ.get("SOKO_TESTING") else settings.DATABASE_URL,
+    )
+
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    _get_database_url(),
     echo=settings.DEBUG,
-    pool_size=20,
-    max_overflow=10,
+    pool_size=20 if not os.environ.get("SOKO_TESTING") else 5,
+    max_overflow=10 if not os.environ.get("SOKO_TESTING") else 0,
 )
 
 async_session = async_sessionmaker(
