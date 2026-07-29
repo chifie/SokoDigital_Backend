@@ -32,12 +32,20 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Register a new user",
+    summary="Register a new user account",
+    responses={
+        201: {"description": "User created successfully"},
+        409: {"description": "Email or username already exists"},
+    },
 )
 async def register(body: UserRegister, db: AsyncSession = Depends(get_db)) -> User:
-    """Create a new user account.
+    """
+    Create a new user account.
 
-    The ``identity`` (email or username) must not already exist.
+    A verification email will be sent to the provided email address.
+    The user must verify their email before accessing certain features.
+
+    The ``identity`` (email or username) must not already exist in the system.
     """
     # Check email
     existing = await db.execute(
@@ -59,16 +67,35 @@ async def register(body: UserRegister, db: AsyncSession = Depends(get_db)) -> Us
             detail="Username already taken",
         )
 
+    # Generate verification token
+    verification_token = uuid.uuid4().hex
+    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
     user = User(
         email=body.email,
         username=body.username,
         hashed_password=hash_password(body.password),
         full_name=body.full_name,
         phone=body.phone,
+        verification_token=verification_token,
+        verification_token_expires_at=verification_token_expires_at,
+        is_verified=False,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    # Send verification email (fire-and-forget)
+    verify_url = f"{settings.APP_URL}/verify-email?token={verification_token}&email={body.email}"
+    try:
+        await send_email(
+            to_email=body.email,
+            template_name="email_verification",
+            context={"verify_url": verify_url},
+        )
+    except Exception:
+        pass  # Don't block registration if email fails
+
     return user
 
 
