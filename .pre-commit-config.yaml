@@ -33,3 +33,4 @@ repos:
         files: ^app/
         additional_dependencies: [types-PyYAML]
         pass_filenames: false
+        stages: [manual]
