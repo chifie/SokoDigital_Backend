@@ -69,6 +69,13 @@ from app.middleware.metrics import MetricsMiddleware, metrics_endpoint
 app.add_middleware(MetricsMiddleware)  # type: ignore[arg-type]
 
 # ---------------------------------------------------------------------------
+# Response cache middleware (Redis-backed, caches GET responses)
+# ---------------------------------------------------------------------------
+from app.middleware.cache import CacheMiddleware
+
+app.add_middleware(CacheMiddleware, default_ttl=settings.CACHE_DEFAULT_TTL)  # type: ignore[arg-type]
+
+# ---------------------------------------------------------------------------
 # CORS — allow the frontend origins
 # ---------------------------------------------------------------------------
 app.add_middleware(

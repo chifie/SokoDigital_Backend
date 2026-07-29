@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # Redis (optional, for distributed rate limiting & caching)
     REDIS_URL: Optional[str] = None
 
+    # Cache (TTL for Redis response cache)
+    CACHE_DEFAULT_TTL: int = 60
+
     # Sentry (optional, for error tracking)
     SENTRY_DSN: Optional[str] = None
 
