@@ -20,6 +20,40 @@ setup_logging()
 logger = logging.getLogger("app")
 
 
+# ---------------------------------------------------------------------------
+# Sentry error monitoring (optional — configured via SENTRY_DSN env var)
+# ---------------------------------------------------------------------------
+def setup_sentry() -> None:
+    """Initialize Sentry SDK if ``SENTRY_DSN`` is configured."""
+    if not settings.SENTRY_DSN:
+        logger.debug("Sentry DSN not configured — skipping Sentry initialization")
+        return
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            release=settings.APP_VERSION,
+            traces_sample_rate=0.2,  # Sample 20% of transactions in production
+            send_default_pii=False,  # Don't send user data by default
+        )
+        logger.info(
+            "Sentry initialized (env=%s, release=%s, sample_rate=0.2)",
+            settings.ENVIRONMENT,
+            settings.APP_VERSION,
+        )
+    except ImportError:
+        logger.warning(
+            "sentry-sdk not installed — install with: pip install sentry-sdk"
+        )
+    except Exception as exc:
+        logger.error("Failed to initialize Sentry: %s", exc)
+
+
+setup_sentry()
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     """Lifecycle handler - creates tables on startup, disposes engine on shutdown."""
@@ -93,6 +127,26 @@ app = FastAPI(
 from app.utils.response import register_error_handlers
 
 register_error_handlers(app)
+
+# If Sentry is active, attach a before-send callback to scrub sensitive data
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+
+        def _before_send(event: dict, hint: dict) -> dict | None:
+            """Scrub sensitive fields from Sentry events before sending."""
+            if "request" in event and "data" in event["request"]:
+                data = event["request"]["data"]
+                if isinstance(data, dict):
+                    for field in ("password", "token", "secret", "authorization"):
+                        if field in data:
+                            data[field] = "[scrubbed]"
+            return event
+
+        sentry_sdk.set_before_send_callback(_before_send)  # type: ignore[arg-type]
+        logger.debug("Sentry before-send callback registered (scrubs passwords)")
+    except ImportError:
+        pass
 
 # ---------------------------------------------------------------------------
 # API versioning middleware — adds version & deprecation headers
