@@ -80,21 +80,21 @@ jobs:
           DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/sokodigital_test"
           SOKO_TESTING: ""
 
-  build:
-    name: Build & Docker
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: false
-          tags: sokodigital-api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+  # Docker build disabled — no Dockerfile yet.
+  # Uncomment the `build` job below once a Dockerfile is added to the project.
+  # build:
+  #   name: Build & Docker
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #     - name: Build Docker image
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         context: .
+  #         push: false
+  #         tags: sokodigital-api:latest
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
