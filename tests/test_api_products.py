@@ -6,6 +6,7 @@ and authorization checks for seller-level operations.
 NOTE: These require a running PostgreSQL database with migrations + seed data.
 """
 
+import pytest
 from httpx import AsyncClient
 
 
@@ -51,6 +52,7 @@ async def _create_product(
     return resp
 
 
+@pytest.mark.integration
 class TestProductsList:
     """Test public product listing endpoints."""
 
@@ -87,6 +89,7 @@ class TestProductsList:
         assert resp.status_code == 200
 
 
+@pytest.mark.integration
 class TestProductsCreate:
     """Test authenticated product creation."""
 
@@ -94,8 +97,8 @@ class TestProductsCreate:
         """Creating a product without seller profile should fail."""
         _, token = await _register_and_login(client)
         resp = await _create_product(client, token)
-        # May return 403 if seller profile is required
-        assert resp.status_code in (400, 403, 422)
+        # Creating a product without a seller profile returns a client error
+        assert resp.status_code == 403
 
     async def test_create_product_invalid_data(self, client: AsyncClient) -> None:
         """Creating a product with invalid data returns 422."""
@@ -130,7 +133,9 @@ class TestProductsCreate:
         """Creating a product with zero quantity should be allowed (out of stock)."""
         _, token = await _register_and_login(client)
         resp = await _create_product(client, token, {"quantity": 0})
-        assert resp.status_code in (201, 400, 403)
+        # Creating a product with zero quantity should return 201 if seller,
+        # or 403 if not a seller
+        assert resp.status_code in (201, 403)
 
     async def test_create_product_unauthorized(self, client: AsyncClient) -> None:
         """Creating a product without auth returns 401."""
@@ -140,6 +145,7 @@ class TestProductsCreate:
         assert resp.status_code == 401
 
 
+@pytest.mark.integration
 class TestProductsSingle:
     """Test single product retrieval."""
 
@@ -157,9 +163,10 @@ class TestProductsSingle:
     async def test_get_product_invalid_id_format(self, client: AsyncClient) -> None:
         """GET /products/{id} with invalid UUID returns 422."""
         resp = await client.get("/api/v1/products/not-a-uuid")
-        assert resp.status_code in (404, 422)
+        assert resp.status_code == 404
 
 
+@pytest.mark.integration
 class TestProductReviews:
     """Test product review endpoints."""
 
