@@ -43,6 +43,7 @@ from app.schemas.seller import (
     SellerResponse,
     SellerUpdate,
 )
+from app.schemas.seller_follow import FollowResponse, FollowerResponse, FollowingStatus
 from app.schemas.shopping import (
     AddressCreate,
     AddressResponse,
@@ -96,6 +97,9 @@ __all__ = [
     "ReviewCreate",
     "ReviewResponse",
     "ReviewUpdate",
+    "FollowResponse",
+    "FollowerResponse",
+    "FollowingStatus",
     "SellerDashboard",
     "SellerOnboard",
     "SellerResponse",
