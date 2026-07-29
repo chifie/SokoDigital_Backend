@@ -35,6 +35,11 @@ async def lifespan(application: FastAPI):
     # Close the cache connection
     from app.middleware.cache import close_cache
     await close_cache()
+    # Close the ARQ pool if open
+    try:
+        from app.tasks import enqueue_email
+    except ImportError:
+        pass
     logger.info("Shutdown complete")
 
 
