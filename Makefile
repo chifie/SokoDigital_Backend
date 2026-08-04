@@ -14,11 +14,11 @@ DOCKER     := docker
 DOCKER_COMPOSE := docker compose
 TEST_FLAGS := -v --tb=short -k "not test_email_verification"
 
-.PHONY: help install install-dev lint typecheck test test-all \  # help
-        test-e2e test-e2e-down precommit-install precommit-run \ # testing
-        migrate migrate-autogen migrate-show migrate-down \      # database
-        seed docker-up docker-down docker-build \                # docker
-        clean format                                             # tools
+.PHONY: help install install-dev lint typecheck test test-all \
+        test-e2e test-e2e-down precommit-install precommit-run \
+        migrate migrate-autogen migrate-show migrate-down \
+        seed docker-up docker-down docker-build \
+        clean format
 
 
 # ── Help ─────────────────────────────────────────────────────────────────────
@@ -53,10 +53,10 @@ typecheck: ## Run mypy type checker
 # ── Testing ──────────────────────────────────────────────────────────────────
 
 test: ## Run unit tests (skips integration tests needing a database)
-	$(PYTEST) tests/ $(TEST_FLAGS)
+	SOKO_TESTING=1 $(PYTEST) tests/ $(TEST_FLAGS)
 
 test-all: ## Run all tests (unit + integration; requires running PostgreSQL)
-	$(PYTEST) tests/ -v --tb=short
+	SOKO_TESTING=1 $(PYTEST) tests/ -v --tb=short
 
 test-e2e: ## Run full test suite in Docker (isolated, ephemeral, reproducible)
 	$(DOCKER_COMPOSE) -f docker-compose.test.yml up --build \
