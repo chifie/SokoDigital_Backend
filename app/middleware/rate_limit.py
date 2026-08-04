@@ -6,6 +6,7 @@
 """
 
 import logging
+import os
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -189,6 +190,10 @@ def rate_limit(config: RateLimitConfig = GENERAL_RATE_LIMIT) -> Callable:
     """
 
     async def dependency(request: Request) -> None:
+        # Skip rate limiting in test environments (CI sets the SOKO_TESTING env var).
+        if "SOKO_TESTING" in os.environ:
+            return
+
         key = _get_client_key(request)
         allowed = await _limiter.check(key, config)
         if not allowed:
