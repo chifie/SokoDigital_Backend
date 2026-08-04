@@ -57,25 +57,29 @@ class TestProductsList:
     """Test public product listing endpoints."""
 
     async def test_list_products(self, client: AsyncClient) -> None:
-        """GET /products returns a list."""
+        """GET /products returns a paginated result with an items list."""
         resp = await client.get("/api/v1/products")
         assert resp.status_code == 200
         data = resp.json()
-        assert isinstance(data, list)
+        assert isinstance(data, dict)
+        assert "items" in data
+        assert isinstance(data["items"], list)
 
     async def test_list_products_with_pagination(self, client: AsyncClient) -> None:
         """GET /products supports skip/limit pagination."""
         resp = await client.get("/api/v1/products?skip=0&limit=5")
         assert resp.status_code == 200
         data = resp.json()
-        assert isinstance(data, list)
-        assert len(data) <= 5
+        assert isinstance(data["items"], list)
+        assert len(data["items"]) <= 5
 
     async def test_list_products_empty_search(self, client: AsyncClient) -> None:
-        """GET /products with non-matching search returns empty list."""
-        resp = await client.get("/api/v1/products?search=zzzznonexistentxxxx")
+        """GET /products with non-matching search returns empty items."""
+        resp = await client.get("/api/v1/products?q=zzzznonexistentxxxx")
         assert resp.status_code == 200
-        assert isinstance(resp.json(), list)
+        data = resp.json()
+        assert isinstance(data["items"], list)
+        assert data["items"] == []
 
     async def test_list_products_by_category(self, client: AsyncClient) -> None:
         """GET /products with category filter works."""
