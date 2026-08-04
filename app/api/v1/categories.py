@@ -3,7 +3,6 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_current_user, require_admin
 from app.database import get_db
@@ -61,7 +60,28 @@ SEED_CATEGORIES: list[dict] = [
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
 
-# ── Helper ──────────────────────────────────────────────────────────────────
+# ── Helpers ─────────────────────────────────────────────────────────────────
+def _category_to_node(
+    cat: Category,
+    by_parent: dict[uuid.UUID | None, list[Category]],
+) -> CategoryTreeNode:
+    """Build a CategoryTreeNode from an ORM Category.
+
+    In SQLAlchemy 2.0.50 the self-referential ``children`` collection is left
+    as None by eager loading (no selectin query fires), which breaks the
+    ``CategoryTreeNode.children`` list schema. So we group children explicitly
+    in Python and build fresh node objects instead of mutating the ORM
+    relationship.
+    """
+    return CategoryTreeNode(
+        **CategoryResponse.model_validate(cat).model_dump(),
+        children=[
+            _category_to_node(child, by_parent)
+            for child in by_parent.get(cat.id, [])
+        ],
+    )
+
+
 async def _get_category_or_404(
     db: AsyncSession, category_id: uuid.UUID
 ) -> Category:
@@ -122,19 +142,23 @@ async def list_category_tree(
     This is the ideal endpoint for building navigation menus and category
     dropdowns on the frontend.
     """
-    stmt = (
-        select(Category)
-        .options(selectinload(Category.children))
-        .order_by(Category.sort_order, Category.name)
-    )
+    stmt = select(Category).order_by(Category.sort_order, Category.name)
     if not include_inactive:
         stmt = stmt.where(Category.is_active == True)
 
     result = await db.execute(stmt)
-    categories = result.scalars().unique().all()
+    categories = result.scalars().all()
 
-    # Only return top-level categories (no parent) — their children are loaded
-    return [c for c in categories if c.parent_id is None]
+    by_parent: dict[uuid.UUID | None, list[Category]] = {}
+    for cat in categories:
+        by_parent.setdefault(cat.parent_id, []).append(cat)
+
+    # Only return top-level categories (no parent)
+    return [
+        _category_to_node(cat, by_parent)
+        for cat in categories
+        if cat.parent_id is None
+    ]
 
 
 # ── GET /categories/{slug} ──────────────────────────────────────────────────
@@ -148,18 +172,24 @@ async def get_category_by_slug(
     db: AsyncSession = Depends(get_db),
 ):
     """Fetch a single category by its URL slug, including its subcategories."""
-    result = await db.execute(
-        select(Category)
-        .options(selectinload(Category.children))
-        .where(Category.slug == slug)
-    )
+    result = await db.execute(select(Category).where(Category.slug == slug))
     category = result.scalar_one_or_none()
     if category is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Category not found",
         )
-    return category
+
+    # Load all categories and reuse the same grouping as the tree endpoint so
+    # the response is fully nested at every depth (see _category_to_node).
+    all_categories = await db.execute(
+        select(Category).order_by(Category.sort_order, Category.name)
+    )
+    by_parent: dict[uuid.UUID | None, list[Category]] = {}
+    for cat in all_categories.scalars().all():
+        by_parent.setdefault(cat.parent_id, []).append(cat)
+
+    return _category_to_node(category, by_parent)
 
 
 # ── POST /categories (admin only) ───────────────────────────────────────────
