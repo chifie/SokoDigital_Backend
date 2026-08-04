@@ -73,11 +73,17 @@ except ImportError:
         OK = 0
         ERROR = 1
 
-    trace = type("_NoopTrace", (), {  # type: ignore[assignment]
-        "get_tracer": lambda name: _NoopTracer(),
-        "Status": type("Status", (), {"__init__": lambda self, code: None}),
-        "StatusCode": _NoopStatusCode,
-    })()
+    from types import SimpleNamespace
+
+    # Use a plain namespace instead of type(...)() so these lambdas/classes
+    # are NOT bound as instance methods (which would break call signatures
+    # and raise "<lambda>() takes 1 positional argument but 2 were given").
+    trace = SimpleNamespace(  # type: ignore[assignment]
+        get_tracer=lambda name: _NoopTracer(),
+        Status=type("Status", (), {"__init__": lambda self, code: None}),
+        StatusCode=_NoopStatusCode,
+        SpanKind=SimpleNamespace(SERVER=1, CLIENT=2, PRODUCER=3, CONSUMER=4),
+    )
 
 
 # ── Setup ────────────────────────────────────────────────────────────────────
