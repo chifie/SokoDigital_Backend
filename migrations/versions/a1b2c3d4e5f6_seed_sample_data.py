@@ -220,11 +220,13 @@ def upgrade() -> None:
     )
 
     # ── 4. Seller Profile ─────────────────────────────────────────────────
+    # NOTE: sellers.rating/total_sales/total_products/followers/response_rate
+    # are NOT NULL in the schema, so they must be provided explicitly.
     connection.execute(
         sa.text(
             """
-            INSERT INTO sellers (id, user_id, store_name, store_slug, description, location, is_verified, is_active, created_at, updated_at)
-            VALUES (:id, :user_id, :store_name, :slug, :desc, :location, :verified, :active, :now, :now)
+            INSERT INTO sellers (id, user_id, store_name, store_slug, description, location, rating, total_sales, total_products, followers, response_rate, is_verified, is_active, created_at, updated_at)
+            VALUES (:id, :user_id, :store_name, :slug, :desc, :location, :rating, :total_sales, :total_products, :followers, :response_rate, :verified, :active, :now, :now)
             ON CONFLICT (store_slug) DO NOTHING
             """
         ),
@@ -235,6 +237,11 @@ def upgrade() -> None:
             "slug": "techzone-africa",
             "desc": "Your premier destination for electronics and tech accessories in Tanzania. Quality products, fast delivery, excellent customer service.",
             "location": "Dar es Salaam, Tanzania",
+            "rating": 4.8,
+            "total_sales": 0,
+            "total_products": 4,
+            "followers": 0,
+            "response_rate": 100,
             "verified": True,
             "active": True,
             "now": _now(),
