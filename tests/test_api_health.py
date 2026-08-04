@@ -57,8 +57,10 @@ class TestHealthEndpoint:
 
     async def test_health_db_failure_returns_503(self, client: AsyncClient) -> None:
         """When the database is down, health returns 503."""
-        with patch("app.main.engine.connect") as mock_connect:
-            mock_connect.side_effect = Exception("Database connection refused")
+        # Patch the whole engine (not ``engine.connect``, which is read-only
+        # on SQLAlchemy 2.0 AsyncEngine) and make connect() raise.
+        with patch("app.main.engine") as mock_engine:
+            mock_engine.connect.side_effect = Exception("Database connection refused")
             resp = await client.get("/health")
             assert resp.status_code == 503
             data = resp.json()
@@ -81,7 +83,8 @@ class TestHealthEndpoint:
 
     async def test_health_no_trailing_slash(self, client: AsyncClient) -> None:
         """Health endpoint works without trailing slash."""
-        resp = await client.get("/health/")
+        # FastAPI redirects /health/ -> /health (Starlette redirect_slashes).
+        resp = await client.get("/health/", follow_redirects=True)
         assert resp.status_code == 200
 
     async def test_api_info_returns_metadata(self, client: AsyncClient) -> None:
