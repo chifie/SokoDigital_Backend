@@ -19,6 +19,23 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _dispose_engine() -> AsyncGenerator[None, None]:
+    """Dispose the shared async engine after every test.
+
+    pytest-asyncio runs each test in a fresh event loop, but the app's
+    global async engine keeps a connection pool bound to whichever loop
+    created the connections first. Without this, later tests fail with
+    "attached to a different loop" errors (seen as intermittent 503s on
+    the health check). Disposing per-test gives every test a clean pool
+    bound to its own loop.
+    """
+    yield
+    from app.database import engine
+
+    await engine.dispose()
+
+
 @pytest.fixture
 def anyio_backend() -> str:
     """Use asyncio as the async backend for pytest-asyncio."""
