@@ -35,16 +35,15 @@ class TestSellersPublic:
     """Test public seller listing endpoints."""
 
     async def test_list_sellers(self, client: AsyncClient) -> None:
-        """GET /sellers returns a list of sellers."""
-        resp = await client.get("/api/v1/sellers")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert isinstance(data, list)
+        """GET /sellers/{store_slug} returns a public seller profile."""
+        # There is no list endpoint; public access is via /sellers/{store_slug}.
+        resp = await client.get("/api/v1/sellers/nonexistent-store")
+        assert resp.status_code == 404
 
     async def test_list_sellers_is_public(self, client: AsyncClient) -> None:
-        """Listing sellers does NOT require authentication."""
-        resp = await client.get("/api/v1/sellers")
-        assert resp.status_code == 200
+        """Public seller profile lookup does NOT require authentication."""
+        resp = await client.get("/api/v1/sellers/nonexistent-store")
+        assert resp.status_code == 404  # 404 (not 401) proves no auth required
 
     async def test_get_seller_not_found(self, client: AsyncClient) -> None:
         """GET /sellers/{id} with non-existent ID returns 404."""
@@ -90,7 +89,7 @@ class TestSellerFollow:
     async def test_follow_seller_unauthorized(self, client: AsyncClient) -> None:
         """Following a seller without auth returns 401."""
         fake_id = "00000000-0000-0000-0000-000000000000"
-        resp = await client.post(f"/api/v1/sellers/{fake_id}/toggle-follow")
+        resp = await client.post(f"/api/v1/sellers/{fake_id}/follow")
         assert resp.status_code == 401
 
     async def test_follow_nonexistent_seller(self, client: AsyncClient) -> None:
@@ -99,7 +98,7 @@ class TestSellerFollow:
         headers = {"Authorization": f"Bearer {token}"}
         fake_id = "00000000-0000-0000-0000-000000000000"
         resp = await client.post(
-            f"/api/v1/sellers/{fake_id}/toggle-follow",
+            f"/api/v1/sellers/{fake_id}/follow",
             headers=headers,
         )
         assert resp.status_code == 404
@@ -107,16 +106,16 @@ class TestSellerFollow:
     async def test_check_follow_status_unauthorized(self, client: AsyncClient) -> None:
         """Checking follow status without auth returns 401."""
         fake_id = "00000000-0000-0000-0000-000000000000"
-        resp = await client.get(f"/api/v1/sellers/{fake_id}/is-following")
+        resp = await client.get(f"/api/v1/sellers/{fake_id}/follow/status")
         assert resp.status_code == 401
 
     async def test_list_followers_unauthorized(self, client: AsyncClient) -> None:
-        """Listing followers without auth returns 401."""
+        """Listing followers of a non-existent seller returns 404 (public route)."""
         fake_id = "00000000-0000-0000-0000-000000000000"
         resp = await client.get(f"/api/v1/sellers/{fake_id}/followers")
-        assert resp.status_code == 401
+        assert resp.status_code == 404
 
     async def test_list_following_unauthorized(self, client: AsyncClient) -> None:
         """List who I'm following without auth returns 401."""
-        resp = await client.get("/api/v1/sellers/i-follow")
+        resp = await client.get("/api/v1/sellers/following/mine")
         assert resp.status_code == 401
